@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Shop products · RetailFlow</title>
+  <link
+    rel="icon"
+    type="image/png"
+    href="{{ url_for('static', filename='images/tab-logo.png') }}"
+  >
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/catalog.css') }}"
+  >
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/shop.css') }}"
+  >
+</head>
+<body class="catalog-page">
+  <header class="catalog-header">
+    <a class="catalog-brand" href="{{ url_for('products.index') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
+    </a>
+    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
+    <div class="catalog-account">
+      {% if not current_user %}
+        <a class="catalog-cart-link" href="{{ url_for('shop.cart') }}">
+          Bag <span>{{ cart_count }}</span>
+        </a>
+        <a href="{{ url_for('web.login') }}">Sign in</a>
+      {% else %}
+        <span>{{ current_user.name }}</span>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit">Log out</button>
+        </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="catalog-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="shop-messages" role="status">
+          {% for category, message in messages %}
+            <p class="shop-message {{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    <section class="catalog-intro">
+      <p class="catalog-eyebrow">THE RETAILFLOW EDIT</p>
+      <h1>Made to be worn.</h1>
+      <p>Discover the pieces in our current collection.</p>
+    </section>
+
+    <section class="catalog-toolbar" aria-label="Catalog filters">
+      <p class="catalog-count">
+        {{ products|length }} {{ "piece" if products|length == 1 else "pieces" }}
+      </p>
+      <form class="catalog-filters" method="get" action="{{ url_for('products.index') }}">
+        <label class="catalog-search-label">
+          <span class="visually-hidden">Search products</span>
+          <input
+            type="search"
+            name="q"
+            value="{{ search }}"
+            placeholder="Search the collection"
+          >
+        </label>
+        <label>
+          <span class="visually-hidden">Filter by category</span>
+          <select name="category" aria-label="Filter by category">
+            <option value="">All categories</option>
+            {% for category in categories %}
+              <option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>
+                {{ category }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit">Apply</button>
+        {% if search or selected_category %}
+          <a class="catalog-clear" href="{{ url_for('products.index') }}">Clear</a>
+        {% endif %}
+      </form>
+    </section>
+
+    <section class="catalog-grid" aria-label="Products">
+      {% for product in products %}
+        <article class="catalog-card">
+          <a
+            class="catalog-card-link"
+            href="{{ url_for('products.view_product', product_id=product.id) }}"
+            aria-label="View {{ product.name }} details"
+          >
+          <div class="catalog-image-frame">
+            <span class="catalog-new-badge">New Arrivals</span>
+            {% if product.image_filename %}
+              <img
+                class="catalog-product-image"
+                src="{{ url_for('products.product_image', filename=product.image_filename) }}"
+                alt="{{ product.name }}"
+                loading="lazy"
+              >
+              <div class="catalog-image-placeholder" hidden aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none">
+                  <rect x="7" y="9" width="34" height="30" rx="3"></rect>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <path d="m10 34 10-10 7 7 5-5 7 8"></path>
+                </svg>
+                <span>Photo coming soon</span>
+              </div>
+            {% else %}
+              <div class="catalog-image-placeholder" aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none">
+                  <rect x="7" y="9" width="34" height="30" rx="3"></rect>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <path d="m10 34 10-10 7 7 5-5 7 8"></path>
+                </svg>
+                <span>Photo coming soon</span>
+              </div>
+            {% endif %}
+          </div>
+          <div class="catalog-card-details">
+            <h2>{{ product.name }}</h2>
+            {% if product.category %}
+              <p class="catalog-category">{{ product.category }}</p>
+            {% endif %}
+            <p class="catalog-price">₱{{ "{:,.2f}".format(product.price) }}</p>
+            {% if not current_user %}
+              <p class="catalog-availability">
+                {{ "Available" if product.quantity > 0 else "Currently unavailable" }}
+              </p>
+            {% endif %}
+          </div>
+          </a>
+        </article>
+      {% else %}
+        <div class="catalog-empty">
+          <p class="catalog-eyebrow">NOTHING MATCHED</p>
+          <h2>No pieces found</h2>
+          <p>Try another search or view the full collection.</p>
+          <a href="{{ url_for('products.index') }}">View all products</a>
+        </div>
+      {% endfor %}
+    </section>
+  </main>
+
+  <footer class="catalog-footer">
+    <span>RETAILFLOW</span>
+    <span>Everyday essentials, thoughtfully selected.</span>
+  </footer>
+
+  <script>
+    document.querySelectorAll(".catalog-product-image").forEach((image) => {
+      image.addEventListener("error", () => {
+        image.hidden = true;
+        image.nextElementSibling.hidden = false;
+      });
+    });
+  </script>
+  {% if current_user %}
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+  {% endif %}
+</body>
+</html>

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Access denied{% endblock %}
+{% block breadcrumb %}Access denied{% endblock %}
+{% block content %}
+  <section class="panel denied-panel">
+    <p class="eyebrow">RESTRICTED AREA</p>
+    <h1>Access denied</h1>
+    <p class="subheading">
+      Your account does not have permission to open this page or perform that action.
+      Contact an administrator if you need access.
+    </p>
+    {% if current_user and current_user.allows("overview") %}
+      <a class="button primary" href="{{ url_for('dashboard.index') }}">
+        Return to overview
+      </a>
+    {% endif %}
+  </section>
+{% endblock %}

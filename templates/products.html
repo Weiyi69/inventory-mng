@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% block title %}Products{% endblock %}
+{% block breadcrumb %}Products{% endblock %}
+{% block page_styles %}
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/products.css') }}"
+  >
+{% endblock %}
+
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">YOUR CATALOG</p>
+      <h1>Products</h1>
+      <p class="subheading">
+        Manage your items, pricing, and stock levels.
+      </p>
+    </div>
+    {% if can_write %}
+      <a class="button primary" href="#add-product">＋ Add product</a>
+    {% endif %}
+  </div>
+
+  <section class="panel table-panel">
+    <div class="product-tabs">
+      <a
+        class="{% if not show_archived %}active{% endif %}"
+        href="{{ url_for('products.index') }}"
+      >
+        Active <span>{{ active_count }}</span>
+      </a>
+      <a
+        class="{% if show_archived %}active{% endif %}"
+        href="{{ url_for('products.index', archived=1) }}"
+      >
+        Archived <span>{{ archived_count }}</span>
+      </a>
+    </div>
+
+    <div class="panel-toolbar">
+      <form class="search-form" method="get">
+        {% if show_archived %}
+          <input type="hidden" name="archived" value="1">
+        {% endif %}
+        <span>⌕</span>
+        <input
+          type="search"
+          name="q"
+          value="{{ search }}"
+          placeholder="Search by name, SKU, or barcode"
+        >
+      </form>
+      <span class="result-count">{{ products|length }} products</span>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>PRODUCT</th>
+            <th>SKU / BARCODE</th>
+            <th>CATEGORY</th>
+            <th>SIZE / COLOR</th>
+            {% if can_view_costs %}<th>COST</th>{% endif %}
+            <th>PRICE</th>
+            <th>IN STOCK</th>
+            <th>STATUS</th>
+            {% if not show_archived and can_restock %}
+              <th>RESTOCK</th>
+            {% endif %}
+            <th>BARCODE</th>
+            {% if can_delete %}<th>ACTION</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in products %}
+            <tr>
+              <td>
+                <div class="table-product">
+                  {% if product.image_filename %}
+                    <img
+                      class="product-photo"
+                      src="{{ url_for(
+                        'products.product_image',
+                        filename=product.image_filename
+                      ) }}"
+                      alt="{{ product.name }}"
+                    >
+                  {% else %}
+                    <span class="product-mark">
+                      {{ product.name[:1]|upper }}
+                    </span>
+                  {% endif %}
+                  <strong>{{ product.name }}</strong>
+                </div>
+              </td>
+              <td>
+                <span class="mono">{{ product.sku }}</span>
+                {% if product.barcode != product.sku %}
+                  <small class="cell-sub">Barcode: {{ product.barcode }}</small>
+                {% endif %}
+              </td>
+              <td>{{ product.category }}</td>
+              <td>{{ product.size or "—" }} / {{ product.color or "—" }}</td>
+              {% if can_view_costs %}
+                <td>₱{{ "%.2f"|format(product.cost) }}</td>
+              {% endif %}
+              <td class="amount">₱{{ "%.2f"|format(product.price) }}</td>
+              <td>{{ product.quantity }}</td>
+              <td>
+                {% if show_archived %}
+                  <span class="status-badge">Archived</span>
+                {% elif product.quantity == 0 %}
+                  <span class="status-badge danger">Out of stock</span>
+                {% elif product.is_low_stock %}
+                  <span class="status-badge warning">Low stock</span>
+                {% else %}
+                  <span class="status-badge good">In stock</span>
+                {% endif %}
+              </td>
+              {% if not show_archived and can_restock %}
+                <td>
+                  <form
+                    class="restock-form"
+                    method="post"
+                    action="{{ url_for(
+                      'products.restock',
+                      product_id=product.id
+                    ) }}"
+                  >
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input
+                      aria-label="Restock quantity for {{ product.name }}"
+                      name="quantity"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value="1"
+                      required
+                    >
+                    <button type="submit">＋</button>
+                  </form>
+                </td>
+              {% endif %}
+              <td>
+                <a
+                  class="barcode-link"
+                  href="{{ url_for(
+                    'products.barcode_svg',
+                    product_id=product.id
+                  ) }}"
+                  target="_blank"
+                  title="Open barcode"
+                >
+                  ▥
+                </a>
+              </td>
+              {% if can_delete %}
+                <td>
+                {% if show_archived %}
+                  <form
+                    method="post"
+                    action="{{ url_for(
+                      'products.restore',
+                      product_id=product.id
+                    ) }}"
+                  >
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button
+                      class="button secondary action-button"
+                      type="submit"
+                    >
+                      Restore
+                    </button>
+                  </form>
+                {% else %}
+                  <form
+                    method="post"
+                    action="{{ url_for(
+                      'products.delete',
+                      product_id=product.id
+                    ) }}"
+                    data-confirm="{{ 'Delete ' ~ product.name ~
+                      '? If it has sales history, it will be archived so '
+                      ~ 'old receipts and reports stay intact.' }}"
+                  >
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button
+                      class="button danger-button action-button"
+                      type="submit"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                {% endif %}
+                </td>
+              {% endif %}
+            </tr>
+          {% else %}
+            <tr>
+              <td
+                colspan="{{ 5 + (1 if can_view_costs else 0) + 3
+                  + (1 if not show_archived and can_restock else 0)
+                  + (1 if can_delete else 0) }}"
+                class="table-empty"
+              >
+                {% if show_archived %}
+                  No archived products.
+                {% else %}
+                  No products yet. Add your first product below.
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if show_archived %}
+    <p class="archive-note">
+      Archived products are hidden from checkout and stock alerts.
+      Their previous sales remain in reports and receipts.
+    </p>
+  {% endif %}
+
+  {% if not show_archived and can_write %}
+    <section class="panel form-panel" id="add-product">
+      <div class="panel-heading">
+        <div>
+          <h2>Add a product</h2>
+          <p>Set up an item in your inventory catalog.</p>
+        </div>
+      </div>
+      <form
+        method="post"
+        action="{{ url_for('products.create') }}"
+        class="form-grid"
+        enctype="multipart/form-data"
+      >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>
+          Product name
+          <input
+            name="name"
+            required
+            maxlength="120"
+            placeholder="e.g. Classic cotton tee"
+          >
+        </label>
+        <label>
+          SKU
+          <input
+            name="sku"
+            required
+            maxlength="64"
+            placeholder="e.g. TEE-001-BLK-M"
+          >
+        </label>
+        <label>
+          Barcode <span class="optional">optional (defaults to SKU)</span>
+          <input
+            name="barcode"
+            maxlength="64"
+            placeholder="Scan or enter barcode"
+          >
+        </label>
+        <label>
+          Category
+          <select name="category">
+            <option>Tees</option>
+            <option>Hoodies</option>
+            <option>Sweaters</option>
+            <option>Shirts / Polos</option>
+            <option>Knitwear</option>
+            <option>Denims</option>
+            <option>Pants</option>
+            <option>Shorts</option>
+          </select>
+        </label>
+        <label>
+          Size <span class="optional">optional</span>
+          <input name="size" maxlength="32" placeholder="e.g. S, M, L, 32">
+        </label>
+        <label>
+          Color <span class="optional">optional</span>
+          <input name="color" maxlength="48" placeholder="e.g. Black">
+        </label>
+        <div class="image-upload-field">
+          <label for="product-image" class="image-upload-label">
+            Product photo
+            <span class="optional">JPG, JPEG, PNG, or WebP · max 5 MB</span>
+          </label>
+          <input
+            id="product-image"
+            name="image"
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            data-image-input
+            hidden
+          >
+          <div class="image-upload-content">
+            <div class="image-preview-wrap">
+              <img
+                data-image-preview
+                alt="Selected product preview"
+                class="image-preview hidden"
+              >
+              <span data-image-placeholder class="image-placeholder">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 5.75A1.75 1.75 0 0 1 5.75 4h12.5A1.75 1.75 0 0 1 20 5.75v12.5A1.75 1.75 0 0 1 18.25 20H5.75A1.75 1.75 0 0 1 4 18.25V5.75Z" />
+                  <circle cx="9" cy="9" r="1.5" />
+                  <path d="m4.5 16 4.25-4.25a1.77 1.77 0 0 1 2.5 0L13 13.5l1.25-1.25a1.77 1.77 0 0 1 2.5 0L19.5 15" />
+                </svg>
+                <span>Choose a photo to preview</span>
+              </span>
+            </div>
+            <div class="image-upload-actions">
+              <div class="image-upload-controls">
+                <button
+                  class="button secondary"
+                  type="button"
+                  data-choose-image
+                >
+                  Choose photo
+                </button>
+                <button
+                  class="button secondary image-remove-button hidden"
+                  type="button"
+                  data-remove-image
+                >
+                  Remove photo
+                </button>
+              </div>
+              <span class="image-file-name" data-image-name>No photo selected</span>
+              <span class="image-upload-error hidden" data-image-error role="alert"></span>
+            </div>
+          </div>
+        </div>
+        <label>
+          Selling price (₱)
+          <input
+            name="price"
+            type="number"
+            min="0"
+            step="0.01"
+            required
+            placeholder="0.00"
+          >
+        </label>
+        {% if can_view_costs %}
+          <label>
+            Unit cost (₱)
+            <input
+              name="cost"
+              type="number"
+              min="0"
+              step="0.01"
+              value="0"
+            >
+          </label>
+        {% endif %}
+        <label>
+          Initial stock
+          <input
+            name="quantity"
+            type="number"
+            min="0"
+            step="1"
+            value="0"
+            required
+          >
+        </label>
+        <label>
+          Low-stock alert at
+          <input
+            name="low_stock_threshold"
+            type="number"
+            min="0"
+            step="1"
+            value="5"
+            required
+          >
+        </label>
+        <div class="form-actions">
+          <button class="button primary" type="submit">Add product</button>
+        </div>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

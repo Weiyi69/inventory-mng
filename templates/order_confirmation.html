@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order confirmed · RetailFlow</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/tab-logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/catalog.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
+</head>
+<body class="catalog-page">
+  <header class="catalog-header">
+    <a class="catalog-brand" href="{{ url_for('products.index') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
+    </a>
+    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
+    <div class="catalog-account"><a href="{{ url_for('products.index') }}">Shop products</a></div>
+  </header>
+  <main class="shop-main confirmation-main">
+    <p class="catalog-eyebrow">ORDER RECEIVED</p>
+    <h1 class="shop-title">Thank you, {{ order.customer_name }}.</h1>
+    <p class="confirmation-copy">
+      Your Cash on Delivery order has been placed. Keep your reference for this confirmation.
+    </p>
+    <section class="confirmation-card">
+      <div class="confirmation-heading">
+        <div>
+          <span>Order reference</span>
+          <strong>{{ order.public_reference }}</strong>
+        </div>
+        <span class="order-status">{{ status_label }}</span>
+      </div>
+      {% for item in order.items %}
+        <div class="confirmation-line">
+          <span>{{ item.product_name }} <small>× {{ item.quantity }}</small></span>
+          <span>₱{{ "{:,.2f}".format(item.unit_price * item.quantity) }}</span>
+        </div>
+      {% endfor %}
+      <div class="confirmation-line"><span>Subtotal</span><span>₱{{ "{:,.2f}".format(order.subtotal) }}</span></div>
+      <div class="confirmation-line"><span>Delivery fee</span><span>₱0.00</span></div>
+      <div class="confirmation-total"><strong>Total due on delivery</strong><strong>₱{{ "{:,.2f}".format(order.total) }}</strong></div>
+      <p class="confirmation-payment">Payment method · Cash on Delivery</p>
+    </section>
+    <a class="shop-button" href="{{ url_for('products.index') }}">Continue shopping</a>
+  </main>
+  <footer class="catalog-footer"><span>RETAILFLOW</span><span>Cash on Delivery · Delivery fee ₱0.00</span></footer>
+</body>
+</html>

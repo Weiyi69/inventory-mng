@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · RetailFlow</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/tab-logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-page">
+  <main class="auth-card">
+    <img
+      class="auth-logo"
+      src="{{ url_for('static', filename='images/logo.png') }}"
+      alt="RetailFlow"
+    >
+    <p class="eyebrow">STORE WORKSPACE</p>
+    <h1>Welcome back</h1>
+    <p class="auth-subtitle">Sign in to manage your RetailFlow workspace.</p>
+    {% if error %}
+      <div class="auth-error" role="alert">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="{{ url_for('web.login', next=request.args.get('next', '')) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        Email
+        <input name="email" type="email" autocomplete="username" required maxlength="254">
+      </label>
+      <label>
+        Password
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="button primary auth-submit" type="submit">Sign in</button>
+    </form>
+  </main>
+</body>
+</html>

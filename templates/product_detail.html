@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{{ product.name }} · RetailFlow</title>
+  <link
+    rel="icon"
+    type="image/png"
+    href="{{ url_for('static', filename='images/tab-logo.png') }}"
+  >
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/catalog.css') }}"
+  >
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/product-detail.css') }}"
+  >
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/shop.css') }}"
+  >
+</head>
+<body class="catalog-page">
+  <header class="catalog-header">
+    <a class="catalog-brand" href="{{ url_for('products.index') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
+    </a>
+    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
+    <div class="catalog-account">
+      {% if not current_user %}
+        <a class="catalog-cart-link" href="{{ url_for('shop.cart') }}">
+          Bag <span>{{ cart_count }}</span>
+        </a>
+        <a href="{{ url_for('web.login') }}">Sign in</a>
+      {% else %}
+        <span>{{ current_user.name }}</span>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit">Log out</button>
+        </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="catalog-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="shop-messages" role="status">
+          {% for category, message in messages %}
+            <p class="shop-message {{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    <nav class="detail-breadcrumb" aria-label="Breadcrumb">
+      <a href="{{ url_for('products.index') }}">Products</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{{ product.name }}</span>
+    </nav>
+
+    <article class="detail-layout">
+      <div class="detail-media-column">
+        <div class="detail-image-frame">
+          {% if product.image_filename %}
+            <img
+              class="detail-product-image"
+              src="{{ url_for('products.product_image', filename=product.image_filename) }}"
+              alt="{{ product.name }}"
+            >
+            <div class="detail-image-placeholder" hidden>
+              <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <rect x="7" y="9" width="34" height="30" rx="3"></rect>
+                <circle cx="18" cy="19" r="3"></circle>
+                <path d="m10 34 10-10 7 7 5-5 7 8"></path>
+              </svg>
+              <span>Product image unavailable</span>
+            </div>
+          {% else %}
+            <div class="detail-image-placeholder">
+              <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <rect x="7" y="9" width="34" height="30" rx="3"></rect>
+                <circle cx="18" cy="19" r="3"></circle>
+                <path d="m10 34 10-10 7 7 5-5 7 8"></path>
+              </svg>
+              <span>Product image coming soon</span>
+            </div>
+          {% endif %}
+        </div>
+        <p class="detail-image-caption">A closer look at the piece.</p>
+      </div>
+
+      <div class="detail-information">
+        <p class="detail-eyebrow">{{ product.category }}</p>
+        <h1>{{ product.name }}</h1>
+        <p class="detail-price">₱{{ "{:,.2f}".format(product.price) }}</p>
+        {% if not current_user %}
+          <p class="detail-public-availability">
+            {{ "Available" if product.quantity > 0 else "Currently unavailable" }}
+          </p>
+          {% if product.quantity > 0 %}
+            <div class="shop-product-actions">
+              <form method="post" action="{{ url_for('shop.add_to_cart', product_id=product.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label for="cart-quantity">Quantity</label>
+                <input
+                  id="cart-quantity"
+                  type="number"
+                  name="quantity"
+                  min="1"
+                  max="99"
+                  value="1"
+                  required
+                >
+                <button class="shop-button secondary" type="submit">Add to Bag</button>
+              </form>
+              <form method="post" action="{{ url_for('shop.buy_now', product_id=product.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label for="buy-now-quantity">Quantity</label>
+                <input
+                  id="buy-now-quantity"
+                  type="number"
+                  name="quantity"
+                  min="1"
+                  max="99"
+                  value="1"
+                  required
+                >
+                <button class="shop-button" type="submit">Buy It Now · Cash on Delivery</button>
+              </form>
+              <p>Cash on Delivery. Delivery fee: ₱0.00.</p>
+            </div>
+          {% endif %}
+        {% endif %}
+        <div class="detail-rule"></div>
+
+        <dl class="detail-summary">
+          <div>
+            <dt>SKU</dt>
+            <dd>{{ product.sku }}</dd>
+          </div>
+          {% if product.barcode and product.barcode != product.sku %}
+            <div>
+              <dt>Barcode</dt>
+              <dd>{{ product.barcode }}</dd>
+            </div>
+          {% endif %}
+          <div>
+            <dt>Category</dt>
+            <dd>{{ product.category }}</dd>
+          </div>
+          {% if product.size %}
+            <div>
+              <dt>Size</dt>
+              <dd>{{ product.size }}</dd>
+            </div>
+          {% endif %}
+          {% if product.color %}
+            <div>
+              <dt>Color</dt>
+              <dd>{{ product.color }}</dd>
+            </div>
+          {% endif %}
+          {% if can_view_stock %}
+            <div>
+              <dt>Availability</dt>
+              <dd>
+                {% if product.quantity > 0 %}
+                  In stock · {{ product.quantity }} available
+                {% else %}
+                  Currently unavailable
+                {% endif %}
+              </dd>
+            </div>
+          {% endif %}
+        </dl>
+
+        <div class="detail-accordions">
+          {% if product.size or product.color %}
+            <details class="detail-accordion">
+              <summary>
+                <span>Product Details</span>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="m3 6 5 5 5-5"></path>
+                </svg>
+              </summary>
+              <div class="detail-accordion-content">
+                {% if product.size %}
+                  <p><strong>Size</strong><span>{{ product.size }}</span></p>
+                {% endif %}
+                {% if product.color %}
+                  <p><strong>Color</strong><span>{{ product.color }}</span></p>
+                {% endif %}
+                <p><strong>Category</strong><span>{{ product.category }}</span></p>
+              </div>
+            </details>
+          {% endif %}
+
+          {% if can_view_stock %}
+            <details class="detail-accordion">
+              <summary>
+                <span>Stock Information</span>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="m3 6 5 5 5-5"></path>
+                </svg>
+              </summary>
+              <div class="detail-accordion-content">
+                <p>
+                  <strong>Availability</strong>
+                  <span>
+                    {% if product.quantity > 0 %}
+                      {{ product.quantity }} available
+                    {% else %}
+                      Currently unavailable
+                    {% endif %}
+                  </span>
+                </p>
+              </div>
+            </details>
+          {% endif %}
+        </div>
+
+        <a class="detail-back-link" href="{{ url_for('products.index') }}">
+          <span aria-hidden="true">←</span> Back to products
+        </a>
+      </div>
+    </article>
+  </main>
+
+  <footer class="catalog-footer">
+    <span>RETAILFLOW</span>
+    <span>Everyday essentials, thoughtfully selected.</span>
+  </footer>
+
+  <script>
+    const detailImage = document.querySelector(".detail-product-image");
+    if (detailImage) {
+      detailImage.addEventListener("error", () => {
+        detailImage.hidden = true;
+        detailImage.nextElementSibling.hidden = false;
+      });
+    }
+  </script>
+  {% if current_user %}
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+  {% endif %}
+</body>
+</html>

@@ -1,0 +1,151 @@
+.admin-create-panel {
+    margin-bottom:18px
+}
+
+.admin-create-form {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(130px,1fr)) auto;
+    align-items:end;
+    gap:12px
+}
+
+.admin-create-form label,
+.admin-account-controls > label {
+    display:grid;
+    gap:6px;
+    color:#5e6a74;
+    font-size:11px;
+    font-weight:600
+}
+
+.admin-create-form input:not([type=hidden]),
+.admin-create-form select,
+.admin-account-controls select {
+    width:100%;
+    height:38px;
+    padding:0 10px;
+    border:1px solid #e2e7ea;
+    border-radius:6px;
+    background:#fff;
+    color:var(--ink);
+    font:inherit
+}
+
+.admin-permission-note {
+    margin:12px 0 0;
+    color:var(--muted);
+    font-size:11px
+}
+
+.admin-user-list {
+    display:grid;
+    gap:16px
+}
+
+.admin-user-card {
+    padding:19px 20px
+}
+
+.admin-user-heading {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:16px
+}
+
+.admin-user-heading h2 {
+    margin:0;
+    font:700 15px Manrope,sans-serif
+}
+
+.admin-user-heading p {
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:11px
+}
+
+.admin-account-controls {
+    display:flex;
+    align-items:center;
+    gap:20px;
+    margin-bottom:18px
+}
+
+.admin-account-controls > label:first-child {
+    min-width:180px
+}
+
+.admin-account-controls .admin-active-toggle {
+    display:flex;
+    align-items:center;
+    gap:8px
+}
+
+.admin-user-card h3 {
+    margin:18px 0 9px;
+    color:#596570;
+    font-size:11px;
+    letter-spacing:.04em;
+    text-transform:uppercase
+}
+
+.permission-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:8px 14px
+}
+
+.permission-option {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-height:28px;
+    color:#53616b;
+    font-size:11px
+}
+
+.permission-option input,
+.admin-active-toggle input {
+    accent-color:var(--green)
+}
+
+.admin-form-actions {
+    display:flex;
+    justify-content:flex-end;
+    margin-top:16px
+}
+
+.table-panel code {
+    display:block;
+    max-width:360px;
+    overflow-wrap:anywhere;
+    color:#63717b;
+    font-size:10px
+}
+
+@media (max-width: 950px) {
+    .admin-create-form {
+        grid-template-columns:repeat(2,minmax(0,1fr))
+    }
+}
+
+@media (max-width: 560px) {
+    .admin-create-form {
+        grid-template-columns:1fr
+    }
+
+    .admin-create-form .button {
+        width:100%
+    }
+
+    .admin-account-controls,
+    .admin-user-heading {
+        align-items:flex-start;
+        flex-direction:column
+    }
+
+    .profile-link {
+        display:none
+    }
+}

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Your bag · RetailFlow</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/tab-logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/catalog.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
+</head>
+<body class="catalog-page">
+  <header class="catalog-header">
+    <a class="catalog-brand" href="{{ url_for('products.index') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
+    </a>
+    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
+    <div class="catalog-account">
+      <a href="{{ url_for('products.index') }}">Continue shopping</a>
+      <a class="catalog-cart-link" href="{{ url_for('shop.cart') }}">Bag <span>{{ cart_count }}</span></a>
+    </div>
+  </header>
+  <main class="shop-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="shop-messages" role="status">
+          {% for category, message in messages %}
+            <p class="shop-message {{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    <p class="catalog-eyebrow">YOUR SELECTION</p>
+    <h1 class="shop-title">Your bag</h1>
+    {% if entries %}
+      <div class="cart-layout">
+        <section class="cart-items" aria-label="Items in your bag">
+          {% for entry in entries %}
+            <article class="cart-item">
+              <div class="cart-item-image">
+                {% if entry.product and entry.product.image_filename %}
+                  <img
+                    src="{{ url_for('products.product_image', filename=entry.product.image_filename) }}"
+                    alt="{{ entry.product.name }}"
+                    onerror="this.hidden=true;this.nextElementSibling.hidden=false"
+                  >
+                  <span hidden>Photo unavailable</span>
+                {% else %}
+                  <span>Photo unavailable</span>
+                {% endif %}
+              </div>
+              <div class="cart-item-description">
+                <h2>{{ entry.product.name if entry.product else "Unavailable product" }}</h2>
+                {% if entry.product %}
+                  <p>{{ entry.product.category }}</p>
+                  <p>₱{{ "{:,.2f}".format(entry.product.price) }} each</p>
+                {% else %}
+                  <p>This product is no longer available.</p>
+                {% endif %}
+                {% if entry.product %}
+                  <form class="cart-item-quantity" method="post"
+                    action="{{ url_for('shop.update_cart_item', product_id=entry.product_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <label for="quantity-{{ entry.product_id }}">Qty</label>
+                    <input id="quantity-{{ entry.product_id }}" type="number" name="quantity"
+                      min="1" max="99" value="{{ entry.quantity }}" required>
+                    <button class="shop-text-button" type="submit">Update</button>
+                  </form>
+                {% endif %}
+              </div>
+              <div class="cart-item-end">
+                <strong>₱{{ "{:,.2f}".format(entry.line_total) }}</strong>
+                <form method="post" action="{{ url_for('shop.remove_cart_item', product_id=entry.product_id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="shop-text-button" type="submit">Remove</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </section>
+        <aside class="cart-summary">
+          <h2>Order summary</h2>
+          <div><span>Subtotal</span><span>₱{{ "{:,.2f}".format(subtotal) }}</span></div>
+          <div><span>Delivery fee</span><span>₱0.00</span></div>
+          <div class="cart-total"><strong>Total</strong><strong>₱{{ "{:,.2f}".format(subtotal) }}</strong></div>
+          <p>Cash on Delivery</p>
+          <a class="shop-button" href="{{ url_for('shop.checkout') }}">Continue to checkout</a>
+          <small>Stock is confirmed when you place your order.</small>
+        </aside>
+      </div>
+    {% else %}
+      <section class="shop-empty">
+        <p>Your bag is empty.</p>
+        <a class="shop-button" href="{{ url_for('products.index') }}">Explore products</a>
+      </section>
+    {% endif %}
+  </main>
+  <footer class="catalog-footer"><span>RETAILFLOW</span><span>Cash on Delivery · Delivery fee ₱0.00</span></footer>
+</body>
+</html>

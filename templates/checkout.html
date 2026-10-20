@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Checkout · RetailFlow</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/tab-logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/catalog.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
+</head>
+<body class="catalog-page">
+  <header class="catalog-header">
+    <a class="catalog-brand" href="{{ url_for('products.index') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
+    </a>
+    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
+    <div class="catalog-account">
+      <a href="{{ url_for('shop.cart') }}">Back to bag</a>
+      <a href="{{ url_for('products.index') }}">Continue shopping</a>
+    </div>
+  </header>
+  <main class="shop-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="shop-messages" role="alert">
+          {% for category, message in messages %}
+            <p class="shop-message {{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    <p class="catalog-eyebrow">CASH ON DELIVERY</p>
+    <h1 class="shop-title">Delivery details</h1>
+    <div class="checkout-layout">
+      <form class="checkout-form" method="post" action="{{ url_for('shop.place_order') }}" data-checkout-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="idempotency_key" value="{{ checkout_key }}">
+        <input type="hidden" name="intent_payload" value="{{ intent_payload }}">
+        <input type="hidden" name="intent_signature" value="{{ intent_signature }}">
+        <label>
+          Full name
+          <input name="customer_name" autocomplete="name" maxlength="120" required>
+        </label>
+        <div class="checkout-form-row">
+          <label>
+            Email address
+            <input type="email" name="customer_email" autocomplete="email" maxlength="254" required>
+          </label>
+          <label>
+            Phone number
+            <input type="tel" name="customer_phone" autocomplete="tel" maxlength="32" required>
+          </label>
+        </div>
+        <label>
+          Delivery address
+          <textarea name="delivery_address" autocomplete="street-address" minlength="8"
+            maxlength="500" rows="4" required></textarea>
+        </label>
+        <label>
+          Order note <span class="shop-muted">(optional)</span>
+          <textarea name="customer_note" maxlength="500" rows="3"></textarea>
+        </label>
+        <div class="cod-notice">
+          <strong>Cash on Delivery</strong>
+          <span>Pay ₱{{ "{:,.2f}".format(total) }} when your order is delivered.</span>
+          <span>Delivery fee: ₱0.00.</span>
+        </div>
+        <button class="shop-button checkout-submit" type="submit">Place COD order</button>
+        <p class="shop-muted">Your order is submitted only once you press the button.</p>
+      </form>
+      <aside class="cart-summary checkout-summary">
+        <h2>Your order</h2>
+        {% for entry in entries %}
+          <div class="checkout-line">
+            <span>{{ entry.product.name }} <small>× {{ entry.quantity }}</small></span>
+            <span>₱{{ "{:,.2f}".format(entry.line_total) }}</span>
+          </div>
+        {% endfor %}
+        <div><span>Subtotal</span><span>₱{{ "{:,.2f}".format(subtotal) }}</span></div>
+        <div><span>Delivery fee</span><span>₱0.00</span></div>
+        <div class="cart-total"><strong>Total</strong><strong>₱{{ "{:,.2f}".format(total) }}</strong></div>
+      </aside>
+    </div>
+  </main>
+  <footer class="catalog-footer"><span>RETAILFLOW</span><span>Cash on Delivery · Delivery fee ₱0.00</span></footer>
+  <script>
+    document.querySelector("[data-checkout-form]").addEventListener("submit", (event) => {
+      const button = event.currentTarget.querySelector(".checkout-submit");
+      if (button.disabled) {
+        event.preventDefault();
+        return;
+      }
+      button.disabled = true;
+      button.textContent = "Submitting order…";
+    });
+  </script>
+</body>
+</html>

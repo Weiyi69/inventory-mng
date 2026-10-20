@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Invoice #{{ sale.id }}{% endblock %}
+{% block breadcrumb %}
+  <a href="{{ url_for('sales.index') }}">Sales</a> / Invoice #{{ sale.id }}
+{% endblock %}
+{% block page_styles %}
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/invoice.css') }}"
+  >
+{% endblock %}
+
+{% block content %}
+  <div class="page-heading no-print">
+    <div>
+      <p class="eyebrow">TRANSACTION COMPLETE</p>
+      <h1>Sale #{{ sale.id }}</h1>
+      <p class="subheading">
+        Your invoice is ready to print or download.
+      </p>
+    </div>
+    <div class="button-group">
+      <a
+        class="button secondary"
+        href="{{ url_for('sales.invoice_pdf', sale_id=sale.id) }}"
+      >
+        ↓ Download PDF
+      </a>
+      <button class="button primary" onclick="window.print()">
+        Print invoice
+      </button>
+    </div>
+  </div>
+
+  <article class="invoice-card">
+    <header class="invoice-header">
+      <a class="brand invoice-brand" href="{{ url_for('dashboard.index') }}">
+        <img
+          class="brand-logo"
+          src="{{ url_for('static', filename='images/logo.png') }}"
+          alt="RetailFlow"
+        >
+      </a>
+      <span class="invoice-label">RECEIPT</span>
+    </header>
+
+    <div class="invoice-meta">
+      <div>
+        <p class="eyebrow">RECEIPT NUMBER</p>
+        <strong>#{{ sale.id }}</strong>
+      </div>
+      <div>
+        <p class="eyebrow">DATE ISSUED</p>
+        <strong>
+          {{ sale.created_at.strftime('%B %d, %Y · %H:%M UTC') }}
+        </strong>
+      </div>
+      <div>
+        <p class="eyebrow">STATUS</p>
+        <span class="status-badge good">Paid</span>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table class="invoice-table">
+        <thead>
+          <tr>
+            <th>ITEM</th>
+            <th>QUANTITY</th>
+            <th>UNIT PRICE</th>
+            <th>AMOUNT</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in sale.items %}
+            <tr>
+              <td>
+                <strong>{{ item.product_name }}</strong>
+                {% if item.product_size or item.product_color %}
+                  <small class="cell-sub">
+                    {{ item.product_size or "" }}
+                    {% if item.product_size and item.product_color %}
+                      ·
+                    {% endif %}
+                    {{ item.product_color or "" }}
+                  </small>
+                {% endif %}
+              </td>
+              <td>{{ item.quantity }}</td>
+              <td>₱{{ "%.2f"|format(item.unit_price) }}</td>
+              <td class="amount">
+                ₱{{ "%.2f"|format(item.unit_price * item.quantity) }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="receipt-summary">
+      <div>
+        <span>Subtotal</span>
+        <strong>₱{{ "%.2f"|format(sale.total) }}</strong>
+      </div>
+      <div>
+        <span>Cash received</span>
+        <strong>₱{{ "%.2f"|format(sale.amount_tendered) }}</strong>
+      </div>
+      <div class="receipt-change">
+        <span>Change</span>
+        <strong>₱{{ "%.2f"|format(sale.change_due) }}</strong>
+      </div>
+      <div class="receipt-paid">
+        <span>Total</span>
+        <strong>₱{{ "%.2f"|format(sale.total) }}</strong>
+      </div>
+    </div>
+
+    <footer class="invoice-thanks">Thank you for your business.</footer>
+  </article>
+{% endblock %}

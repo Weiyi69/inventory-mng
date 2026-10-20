@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}User management{% endblock %}
+{% block breadcrumb %}User management{% endblock %}
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">ACCESS CONTROL</p>
+      <h1>User management</h1>
+      <p class="subheading">Create accounts, set roles, and manage product permissions.</p>
+    </div>
+    <a class="button secondary" href="{{ url_for('admin.audit') }}">Security activity</a>
+  </div>
+
+  <section class="panel admin-create-panel">
+    <div class="panel-heading">
+      <div>
+        <h2>Create account</h2>
+        <p>Passwords must be at least 12 characters. There is no public registration.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('admin.create_user') }}" class="admin-create-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Name<input name="name" maxlength="120" required></label>
+      <label>Email<input name="email" type="email" maxlength="254" required></label>
+      <label>Password<input name="password" type="password" minlength="12" required autocomplete="new-password"></label>
+      <label>Role
+        <select name="role">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+      </label>
+      <button class="button primary" type="submit">Create account</button>
+      {% for page in page_keys %}
+        {% if default_permissions.pages[page] %}
+          <input type="hidden" name="page_{{ page }}" value="on">
+        {% endif %}
+      {% endfor %}
+      {% for action in action_keys %}
+        {% set section, key = action.split(".") %}
+        {% if section == "products" and default_permissions.actions[action] %}
+          <input type="hidden" name="action_{{ section }}_{{ key }}" value="on">
+        {% endif %}
+      {% endfor %}
+    </form>
+    <p class="admin-permission-note">
+      Standard users can access only the product catalog. Product changes, restocking, deletion,
+      and cost visibility remain off unless specifically granted.
+    </p>
+  </section>
+
+  <div class="admin-user-list">
+    {% for user in users %}
+      <section class="panel admin-user-card">
+        <div class="admin-user-heading">
+          <div>
+            <h2>{{ user.name }}</h2>
+            <p>{{ user.email }} · Created {{ user.created_at.strftime('%b %d, %Y') }}</p>
+          </div>
+          <span class="status-badge {% if user.is_active %}good{% else %}danger{% endif %}">
+            {{ "Active" if user.is_active else "Inactive" }}
+          </span>
+        </div>
+        <form method="post" action="{{ url_for('admin.update_user', user_id=user.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="admin-account-controls">
+            <label>Role
+              <select name="role">
+                <option value="user" {% if user.role == "user" %}selected{% endif %}>User</option>
+                <option value="admin" {% if user.role == "admin" %}selected{% endif %}>Admin</option>
+              </select>
+            </label>
+            <label class="admin-active-toggle">
+              <input type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %}>
+              Account active
+            </label>
+          </div>
+          <h3>Page access</h3>
+          {% if user.role == "user" %}
+            <p class="admin-permission-note">
+              Standard users are limited to Products; other workspace pages remain unavailable.
+            </p>
+          {% endif %}
+          <div class="permission-grid">
+            {% for page in page_keys %}
+              {% if user.role == "admin" or page == "products" %}
+                <label class="permission-option">
+                  <input
+                    type="checkbox"
+                    name="page_{{ page }}"
+                    {% if user.permissions.get("pages", {}).get(page, default_permissions.pages[page]) %}checked{% endif %}
+                  >
+                  {{ labels[page] }}
+                </label>
+              {% endif %}
+            {% endfor %}
+          </div>
+          <h3>Actions and data access</h3>
+          <div class="permission-grid">
+            {% for action in action_keys %}
+              {% set section, key = action.split(".") %}
+              {% if user.role == "admin" or section == "products" %}
+                <label class="permission-option">
+                  <input
+                    type="checkbox"
+                    name="action_{{ section }}_{{ key }}"
+                    {% if user.permissions.get("actions", {}).get(action, default_permissions.actions[action]) %}checked{% endif %}
+                  >
+                  {{ labels[action] }}
+                </label>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% if user.role == "admin" %}
+            <p class="admin-permission-note">Administrator accounts always have full permissions.</p>
+          {% endif %}
+          <div class="admin-form-actions">
+            <button class="button primary" type="submit">Save account settings</button>
+          </div>
+        </form>
+      </section>
+    {% endfor %}
+  </div>
+{% endblock %}

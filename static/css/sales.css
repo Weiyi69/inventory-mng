@@ -1,0 +1,261 @@
+.pos-search {
+    display:flex;
+    align-items:center;
+    gap:9px;
+    background:#f7f9fa;
+    border:1px solid #e9edef;
+    border-radius:7px;
+    padding:0 11px;
+    color:#909aa2
+}
+
+.pos-search input {
+    width:100%;
+    border:0;
+    outline:0;
+    background:transparent;
+    font-size:11px;
+    color:var(--ink)
+}
+
+.pos-search input::placeholder {
+    color:#a1aab1
+}
+
+.pos-search:focus-within {
+    border-color:#70c6a9;
+    box-shadow:0 0 0 3px #16a37b12
+}
+
+.sales-layout {
+    display:grid;
+    grid-template-columns:1.12fr .88fr;
+    gap:17px;
+    align-items:start
+}
+
+.pos-panel {
+    padding:21px
+}
+
+.live-indicator {
+    font-size:10px;
+    color:#6a7881;
+    display:flex;
+    align-items:center;
+    gap:6px
+}
+
+.live-indicator i {
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:#22b27e
+}
+
+.pos-search {
+    height:42px;
+    position:relative;
+    margin-bottom:10px
+}
+
+.pos-search>span {
+    font-size:18px
+}
+
+.product-results {
+    position:absolute;
+    z-index:3;
+    top:44px;
+    left:0;
+    right:0;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:8px;
+    box-shadow:0 9px 25px #1f30401c;
+    max-height:250px;
+    overflow-y:auto
+}
+
+.product-result {
+    width:100%;
+    padding:10px 12px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border:0;
+    background:#fff;
+    text-align:left;
+    cursor:pointer
+}
+
+.product-result:hover {
+    background:#f7faf9
+}
+
+.product-result strong {
+    font-size:11px
+}
+
+.product-result small {
+    display:block;
+    color:#89949d;
+    font-size:10px;
+    margin-top:2px
+}
+
+.product-result>.row-grow {
+    flex:1
+}
+
+.result-empty {
+    padding:17px;
+    text-align:center;
+    color:#929ca4;
+    font-size:11px
+}
+
+.cart-items {
+    min-height:190px
+}
+
+.cart-row {
+    display:flex;
+    align-items:center;
+    gap:13px;
+    padding:13px 0;
+    border-bottom:1px solid #f0f2f3
+}
+
+.cart-row .row-grow {
+    flex:1
+}
+
+.cart-row .row-grow strong {
+    font-size:12px
+}
+
+.cart-row .row-grow small {
+    display:block;
+    color:#87929b;
+    font-size:10px;
+    margin-top:3px
+}
+
+.quantity-control {
+    display:flex;
+    align-items:center;
+    border:1px solid #e9edef;
+    border-radius:6px;
+    overflow:hidden
+}
+
+.quantity-control button {
+    width:26px;
+    height:26px;
+    border:0;
+    background:#fafbfb;
+    color:#63717b;
+    cursor:pointer
+}
+
+.quantity-control button:hover {
+    color:var(--green);
+    background:#eff8f4
+}
+
+.quantity-control span {
+    min-width:26px;
+    text-align:center;
+    font-size:11px;
+    font-weight:600
+}
+
+.cart-line-total {
+    width:59px;
+    text-align:right;
+    font-size:11px
+}
+
+.cart-footer {
+    border-top:1px solid var(--line);
+    padding-top:15px
+}
+
+.cart-total {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:13px
+}
+
+.cart-total span {
+    font-size:12px;
+    color:#68757f
+}
+
+.cart-total strong {
+    font:800 22px Manrope,sans-serif
+}
+
+.full-width {
+    width:100%;
+    height:41px;
+    justify-content:space-between
+}
+
+.transaction-panel {
+    min-height:250px
+}
+
+.tender-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px
+}
+
+.tender-row label {
+    font-size:12px;
+    color:#68757f
+}
+
+.tender-row input {
+    width:125px;
+    height:34px;
+    padding:0 9px;
+    border:1px solid #e2e7ea;
+    border-radius:6px;
+    text-align:right;
+    font-size:12px
+}
+
+.tender-row input:focus {
+    outline:0;
+    border-color:#70c6a9;
+    box-shadow:0 0 0 3px #16a37b12
+}
+
+.change-preview {
+    margin-top:-5px
+}
+
+.change-preview strong.insufficient {
+    color:var(--red)
+}
+
+.product-result .product-photo {
+    width:36px;
+    height:36px
+}
+
+.cart-row .product-photo {
+    width:40px;
+    height:40px
+}
+
+@media (max-width: 1120px) {
+    .sales-layout {
+        grid-template-columns: 1fr;
+    }
+}

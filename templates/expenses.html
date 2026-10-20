@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Expenses{% endblock %}
+{% block breadcrumb %}Expenses{% endblock %}
+{% block page_styles %}
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/expenses.css') }}"
+  >
+{% endblock %}
+
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">KEEP SPENDING IN VIEW</p>
+      <h1>Expenses</h1>
+      <p class="subheading">
+        Record and review your store's operating costs.
+      </p>
+    </div>
+  </div>
+
+  <div class="expenses-layout">
+    {% if can_create %}
+      <section class="panel form-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Record an expense</h2>
+          <p>Log a business cost.</p>
+        </div>
+      </div>
+      <form
+        method="post"
+        action="{{ url_for('expenses.create') }}"
+        class="stacked-form"
+      >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>
+          Description
+          <input
+            name="description"
+            required
+            maxlength="160"
+            placeholder="e.g. Monthly rent"
+          >
+        </label>
+        <label>
+          Category
+          <input
+            name="category"
+            maxlength="80"
+            placeholder="e.g. Utilities"
+          >
+        </label>
+        <label>
+          Amount (₱)
+          <input
+            name="amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            required
+            placeholder="0.00"
+          >
+        </label>
+        <button class="button primary" type="submit">Save expense</button>
+      </form>
+      </section>
+    {% endif %}
+
+    <section class="panel table-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Recent expenses</h2>
+          <p>Up to 100 most recent entries</p>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>DESCRIPTION</th>
+              <th>CATEGORY</th>
+              <th>DATE</th>
+              <th>AMOUNT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for expense in expenses %}
+              <tr>
+                <td><strong>{{ expense.description }}</strong></td>
+                <td>{{ expense.category }}</td>
+                <td>{{ expense.created_at.strftime('%b %d, %Y') }}</td>
+                <td class="amount">
+                  ₱{{ "%.2f"|format(expense.amount) }}
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="4" class="table-empty">
+                  No expenses recorded yet.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+{% endblock %}

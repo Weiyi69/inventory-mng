@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block breadcrumb %}Reports{% endblock %}
+{% block page_styles %}
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/reports.css') }}"
+  >
+{% endblock %}
+
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">KNOW YOUR NUMBERS</p>
+      <h1>Reports</h1>
+      <p class="subheading">
+        {% if show_financials %}
+          Sales, expenses, and product performance at a glance.
+        {% else %}
+          Product activity and units sold. Financial figures are restricted.
+        {% endif %}
+      </p>
+    </div>
+    <form class="range-picker" method="get">
+      <label class="visually-hidden" for="report-range">
+        Report date range
+      </label>
+      <select
+        class="date-range"
+        id="report-range"
+        name="range"
+        onchange="this.form.submit()"
+      >
+        <option value="24h" {% if selected_range == "24h" %}selected{% endif %}>
+          Last 24 hours
+        </option>
+        <option value="7d" {% if selected_range == "7d" %}selected{% endif %}>
+          Last 7 days
+        </option>
+        <option value="4w" {% if selected_range == "4w" %}selected{% endif %}>
+          Last 4 weeks
+        </option>
+        <option value="all" {% if selected_range == "all" %}selected{% endif %}>
+          All time
+        </option>
+      </select>
+    </form>
+  </div>
+
+  {% if show_financials %}
+    <section class="panel report-chart-panel">
+    <div class="panel-heading">
+      <div>
+        <h2>Revenue, expenses & estimated profit</h2>
+        <p>
+          {{ range_description }} Profit subtracts item cost and expenses.
+        </p>
+      </div>
+    </div>
+    <div class="report-chart-wrap">
+      <canvas id="reportChart"></canvas>
+    </div>
+    </section>
+  {% endif %}
+
+  <section class="panel table-panel report-table">
+    <div class="panel-heading">
+      <div>
+        <h2>Product performance</h2>
+        <p>
+          {% if show_financials %}
+            Your top products by revenue, all-time
+          {% else %}
+            Your top products by units sold
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>PRODUCT</th>
+            <th>UNITS SOLD</th>
+            {% if show_financials %}<th>TOTAL REVENUE</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% if show_financials %}
+            {% for name, units, revenue in products %}
+              <tr>
+                <td>
+                  <div class="table-product">
+                    <span class="product-mark">{{ name[:1]|upper }}</span>
+                    <strong>{{ name }}</strong>
+                  </div>
+                </td>
+                <td>{{ units }}</td>
+                <td class="amount">₱{{ "%.2f"|format(revenue) }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="3" class="table-empty">
+                  Sales data will appear once you complete a transaction.
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            {% for name, units in products %}
+              <tr>
+                <td>
+                  <div class="table-product">
+                    <span class="product-mark">{{ name[:1]|upper }}</span>
+                    <strong>{{ name }}</strong>
+                  </div>
+                </td>
+                <td>{{ units }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="2" class="table-empty">No sales activity to show yet.</td>
+              </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+
+{% block head %}
+  {% if show_financials %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if show_financials %}
+<script>
+  const labels = {{ labels|tojson }};
+  new Chart(document.getElementById('reportChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Revenue',
+          data: {{ sales_data|tojson }},
+          backgroundColor: '#16a37b',
+          borderRadius: 5
+        },
+        {
+          label: 'Expenses',
+          data: {{ expense_data|tojson }},
+          backgroundColor: '#f2a65a',
+          borderRadius: 5
+        },
+        {
+          label: 'Estimated profit',
+          data: {{ profit_data|tojson }},
+          backgroundColor: '#6477d8',
+          borderRadius: 5
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', align: 'start' }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: '#eef1f4' },
+          ticks: { callback: value => '₱' + value }
+        },
+        x: {
+          grid: { display: false },
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 12,
+            maxRotation: 0
+          }
+        }
+      }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

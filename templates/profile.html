@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}My profile{% endblock %}
+{% block breadcrumb %}My profile{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">ACCOUNT</p>
+      <h1>My profile</h1>
+      <p class="subheading">Your account details and access role.</p>
+    </div>
+  </div>
+  <section class="panel profile-card">
+    <dl>
+      <div><dt>Name</dt><dd>{{ current_user.name }}</dd></div>
+      <div><dt>Email</dt><dd>{{ current_user.email }}</dd></div>
+      <div><dt>Role</dt><dd>{{ current_user.role|title }}</dd></div>
+    </dl>
+  </section>
+{% endblock %}

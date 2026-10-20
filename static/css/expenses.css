@@ -1,0 +1,54 @@
+.stacked-form label {
+    display:grid;
+    gap:6px;
+    color:#5e6a74;
+    font-size:11px;
+    font-weight:600
+}
+
+.stacked-form input {
+    width:100%;
+    height:38px;
+    border:1px solid #e2e7ea;
+    border-radius:6px;
+    padding:0 10px;
+    outline:0;
+    color:var(--ink);
+    background:#fff;
+    font-size:12px
+}
+
+.stacked-form input:focus {
+    border-color:#70c6a9;
+    box-shadow:0 0 0 3px #16a37b12
+}
+
+.expenses-layout {
+    display:grid;
+    grid-template-columns:.72fr 1.28fr;
+    gap:17px;
+    align-items:start
+}
+
+.stacked-form {
+    display:grid;
+    gap:15px
+}
+
+.stacked-form .button {
+    margin-top:4px
+}
+
+.expenses-layout>.form-panel {
+    margin-top:0
+}
+
+.expenses-layout>.table-panel>.panel-heading {
+    padding:19px 20px 0
+}
+
+@media (max-width: 760px) {
+    .expenses-layout {
+        grid-template-columns: 1fr;
+    }
+}

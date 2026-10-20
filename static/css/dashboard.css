@@ -1,0 +1,176 @@
+.stats-grid {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:15px;
+    margin-bottom:19px
+}
+
+.stat-card {
+    background:var(--surface);
+    border:1px solid #e9edef;
+    border-radius:10px;
+    box-shadow:var(--shadow)
+}
+
+.stat-card {
+    padding:18px 19px
+}
+
+.stat-top {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    color:#66737e;
+    font-size:12px;
+    font-weight:600;
+    margin-bottom:10px
+}
+
+.stat-card>strong {
+    display:block;
+    font:800 25px Manrope,sans-serif;
+    letter-spacing:-.7px
+}
+
+.stat-note {
+    display:block;
+    color:#939da5;
+    font-size:11px;
+    margin-top:6px
+}
+
+.stat-icon {
+    width:29px;
+    height:29px;
+    border-radius:8px;
+    display:grid;
+    place-items:center;
+    font-size:16px
+}
+
+.stat-icon.green {
+    color:#138d69;
+    background:#e7f6f0
+}
+
+.stat-icon.orange {
+    color:#d98a34;
+    background:#fff3e6
+}
+
+.stat-icon.blue {
+    color:#527cd0;
+    background:#edf2ff
+}
+
+.stat-icon.red {
+    color:#d75852;
+    background:#fff0ef
+}
+
+.dashboard-grid {
+    display:grid;
+    grid-template-columns:1.35fr 1fr;
+    gap:17px
+}
+
+.chart-wrap {
+    height:230px
+}
+
+.chart-panel {
+    min-height:320px
+}
+
+.stats-grid {
+    grid-template-columns:repeat(3,minmax(0,1fr))
+}
+
+.stats-grid {
+    grid-template-columns:repeat(3,minmax(0,1fr))
+}
+
+.stat-card {
+    min-width:0
+}
+
+.stat-primary {
+    background:linear-gradient(115deg,#fff 35%,#f1faf6 100%);
+    border-color:#dcefe7;
+    padding:21px 23px;
+    position:relative
+}
+
+.stat-primary>strong {
+    font-size:32px;
+    color:#117d5d
+}
+
+.stat-primary .stat-note {
+    font-size:11px
+}
+
+.stat-card-link {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    margin-top:13px;
+    color:var(--green-dark);
+    font-size:10px;
+    font-weight:700
+}
+
+.stat-card-link span {
+    font-size:14px;
+    line-height:10px;
+    transition:transform .15s
+}
+
+.stat-card-link:hover span {
+    transform:translateX(3px)
+}
+
+.attention-card.has-alert {
+    background:#fffaf7;
+    border-color:#f4e3d5
+}
+
+.attention-card.has-alert>strong {
+    color:#ba642f
+}
+
+.attention-card.all-clear {
+    background:#f6fbf8;
+    border-color:#e1f0e7
+}
+
+.stat-profit>strong {
+    color:#16805f
+}
+
+@media (max-width: 1120px) {
+    .stats-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-card,
+    .stat-primary {
+        padding: 16px;
+    }
+}

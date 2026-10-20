@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Security activity{% endblock %}
+{% block breadcrumb %}Security activity{% endblock %}
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">SECURITY</p>
+      <h1>Security activity</h1>
+      <p class="subheading">Recent sign-ins, token events, and account changes.</p>
+    </div>
+    <a class="button secondary" href="{{ url_for('admin.users') }}">User management</a>
+  </div>
+  <section class="panel table-panel">
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>TIME (UTC)</th><th>EVENT</th><th>ACTOR</th><th>ACCOUNT</th><th>DETAILS</th><th>IP ADDRESS</th></tr></thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td>{{ event.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+              <td>{{ event.event.replace("_", " ")|title }}</td>
+              <td>{{ event.actor.email if event.actor else "System" }}</td>
+              <td>{{ event.target_user.email if event.target_user else "—" }}</td>
+              <td><code>{{ event.details|tojson }}</code></td>
+              <td>{{ event.ip_address or "—" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="table-empty">No security activity recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

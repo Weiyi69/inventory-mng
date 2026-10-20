@@ -1,0 +1,252 @@
+.barcode-link {
+    font-size:19px;
+    color:#778893
+}
+
+.form-grid {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:15px 18px
+}
+
+.form-grid label {
+    display:grid;
+    gap:6px;
+    color:#5e6a74;
+    font-size:11px;
+    font-weight:600
+}
+
+.form-grid input {
+    width:100%;
+    height:38px;
+    border:1px solid #e2e7ea;
+    border-radius:6px;
+    padding:0 10px;
+    outline:0;
+    color:var(--ink);
+    background:#fff;
+    font-size:12px
+}
+
+.form-grid input:focus {
+    border-color:#70c6a9;
+    box-shadow:0 0 0 3px #16a37b12
+}
+
+.restock-form {
+    display:flex;
+    align-items:center;
+    gap:4px
+}
+
+.restock-form input {
+    width:44px;
+    height:27px;
+    border:1px solid #e5eaec;
+    border-radius:5px;
+    padding:0 5px;
+    font-size:10px
+}
+
+.restock-form button {
+    height:27px;
+    width:27px;
+    border:0;
+    border-radius:5px;
+    background:#e8f6f0;
+    color:#138d69;
+    font-weight:700;
+    cursor:pointer
+}
+
+.restock-form button:hover {
+    background:#d5efe4
+}
+
+.form-grid select {
+    width:100%;
+    height:38px;
+    border:1px solid #e2e7ea;
+    border-radius:6px;
+    padding:0 10px;
+    outline:0;
+    background:#fff;
+    color:var(--ink);
+    font-size:12px
+}
+
+.form-grid select:focus {
+    border-color:#70c6a9;
+    box-shadow:0 0 0 3px #16a37b12
+}
+
+.product-tabs {
+    display:flex;
+    gap:18px;
+    padding:13px 18px 0;
+    border-bottom:1px solid var(--line)
+}
+
+.product-tabs a {
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:0 1px 11px;
+    color:#78848d;
+    font-size:11px;
+    font-weight:600;
+    border-bottom:2px solid transparent
+}
+
+.product-tabs a.active {
+    color:var(--green-dark);
+    border-color:var(--green)
+}
+
+.product-tabs a span {
+    min-width:19px;
+    padding:2px 5px;
+    text-align:center;
+    border-radius:10px;
+    background:#f0f3f4;
+    color:#75828a;
+    font-size:9px
+}
+
+.product-tabs a.active span {
+    background:var(--green-soft);
+    color:var(--green-dark)
+}
+
+.action-button {
+    padding:6px 9px;
+    font-size:10px;
+    white-space:nowrap
+}
+
+.button.danger-button {
+    border:1px solid #f0d9d7;
+    background:#fff;
+    color:#c34e48
+}
+
+.button.danger-button:hover {
+    background:#fff0ef;
+    border-color:#e9b9b5
+}
+
+.archive-note {
+    margin:11px 2px;
+    color:#78848d;
+    font-size:11px
+}
+
+.image-upload-field {
+    grid-column:auto;
+    min-width:0
+}
+
+.image-upload-content {
+    display:flex;
+    align-items:center;
+    gap:14px;
+    min-width:0;
+    margin-top:2px
+}
+
+.image-preview-wrap {
+    display:flex;
+    flex:none;
+    align-items:center;
+    justify-content:center;
+    width:132px;
+    height:132px;
+    overflow:hidden;
+    border:1px solid #e2e7ea;
+    border-radius:10px;
+    background:#f8faf9
+}
+
+.image-preview {
+    display:block;
+    width:100%;
+    height:100%;
+    object-fit:cover
+}
+
+.image-placeholder {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    padding:10px;
+    text-align:center;
+    color:#909ba3;
+    font-size:10px;
+    font-weight:400
+}
+
+.image-placeholder svg {
+    width:27px;
+    height:27px;
+    stroke:#9aa6ad;
+    stroke-width:1.5;
+    stroke-linecap:round;
+    stroke-linejoin:round
+}
+
+.image-upload-actions {
+    display:grid;
+    gap:8px;
+    min-width:0
+}
+
+.image-upload-controls {
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:7px
+}
+
+.image-upload-controls .button {
+    padding:7px 10px;
+    font-size:11px
+}
+
+.image-file-name {
+    overflow:hidden;
+    color:#7d8992;
+    font-size:11px;
+    text-overflow:ellipsis;
+    white-space:nowrap
+}
+
+.image-upload-error {
+    color:#b54740;
+    font-size:11px;
+    line-height:1.4
+}
+
+@media (max-width: 760px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid .image-upload-field,
+    .form-grid .form-actions {
+        grid-column: 1;
+    }
+}
+
+@media (max-width: 420px) {
+    .image-upload-content {
+        align-items:flex-start;
+        gap:10px
+    }
+
+    .image-preview-wrap {
+        width:120px;
+        height:120px
+    }
+}

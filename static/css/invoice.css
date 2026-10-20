@@ -1,0 +1,137 @@
+.invoice-card {
+    background:white;
+    border:1px solid #e9edef;
+    border-radius:10px;
+    padding:34px 40px;
+    max-width:850px;
+    margin:0 auto;
+    box-shadow:var(--shadow)
+}
+
+.invoice-header {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:1px solid var(--line);
+    padding-bottom:22px
+}
+
+.invoice-brand {
+    margin:0;
+    padding:0;
+    width:190px
+}
+
+.invoice-brand .brand-logo {
+    height:54px
+}
+
+.invoice-label {
+    font:700 12px Manrope,sans-serif;
+    letter-spacing:1.4px;
+    color:#7c8992
+}
+
+.invoice-meta {
+    display:flex;
+    gap:75px;
+    padding:26px 0
+}
+
+.invoice-meta .eyebrow {
+    font-size:9px;
+    color:#929ca4
+}
+
+.invoice-meta strong {
+    font-size:12px
+}
+
+.invoice-total {
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    gap:27px;
+    padding:19px 17px;
+    color:#5e6a74
+}
+
+.invoice-total strong {
+    font:800 21px Manrope,sans-serif;
+    color:var(--ink)
+}
+
+.invoice-thanks {
+    text-align:center;
+    border-top:1px solid var(--line);
+    padding-top:19px;
+    margin-top:7px;
+    color:#8b969e;
+    font-size:11px
+}
+
+.invoice-table th {
+    padding:13px 17px
+}
+
+.invoice-table td {
+    padding:13px 17px
+}
+
+.button-group {
+    display:flex;
+    gap:9px
+}
+
+.receipt-summary {
+    width:min(300px,100%);
+    margin:0 17px 0 auto;
+    padding:0 0 10px
+}
+
+.receipt-summary>div {
+    display:flex;
+    justify-content:space-between;
+    padding:7px 0;
+    font-size:11px;
+    color:#68757f
+}
+
+.receipt-summary strong {
+    color:#35434c
+}
+
+.receipt-summary .receipt-change {
+    border-bottom:1px solid var(--line)
+}
+
+.receipt-summary .receipt-paid {
+    font-weight:700;
+    color:var(--ink);
+    font-size:13px
+}
+
+@media (max-width: 760px) {
+    .invoice-card {
+        padding: 23px 14px;
+    }
+
+    .invoice-meta {
+        flex-wrap: wrap;
+        gap: 18px 30px;
+    }
+
+    .button-group {
+        flex-wrap: wrap;
+    }
+}
+
+@media print {
+    .invoice-card {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        box-shadow: none;
+    }
+}

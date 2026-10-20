@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block breadcrumb %}Orders{% endblock %}
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
+{% endblock %}
+{% block content %}
+  <section class="order-admin-page">
+    <div class="admin-page-heading">
+      <div>
+        <p class="eyebrow">STORE MANAGEMENT</p>
+        <h1>Customer orders</h1>
+        <p>Guest Cash on Delivery orders. Sales are recorded only after delivery and payment collection.</p>
+      </div>
+      <form method="get" class="order-filter">
+        <label for="order-status-filter">Filter status</label>
+        <select id="order-status-filter" name="status">
+          <option value="">All statuses</option>
+          {% for value in statuses %}
+            <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>
+              {{ status_labels[value] }}
+            </option>
+          {% endfor %}
+        </select>
+        <button class="button secondary" type="submit">Filter</button>
+      </form>
+    </div>
+    {% if orders %}
+      <div class="order-admin-table-wrap">
+        <table class="order-admin-table">
+          <thead>
+            <tr><th>ORDER</th><th>CUSTOMER</th><th>PLACED</th><th>STATUS</th><th>PAYMENT</th><th>TOTAL</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+              <tr>
+                <td><a class="order-reference" href="{{ url_for('shop.admin_order_detail', order_id=order.id) }}">#{{ order.id }}</a></td>
+                <td><strong>{{ order.customer_name }}</strong><small>{{ order.customer_email }}</small></td>
+                <td>{{ order.created_at.strftime("%b %d, %Y · %I:%M %p") }}</td>
+                <td><span class="order-status">{{ status_labels[order.status] }}</span></td>
+                <td>{{ "Collected" if order.payment_status == "collected" else "COD · unpaid" }}</td>
+                <td>₱{{ "{:,.2f}".format(order.total) }}</td>
+                <td><a href="{{ url_for('shop.admin_order_detail', order_id=order.id) }}">Review</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <section class="shop-empty admin-empty">
+        <h2>No orders found</h2>
+        <p>Guest orders will appear here after checkout.</p>
+      </section>
+    {% endif %}
+  </section>
+{% endblock %}

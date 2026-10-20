@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Order #{{ order.id }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('shop.admin_orders') }}">Orders</a> / #{{ order.id }}{% endblock %}
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
+{% endblock %}
+{% block content %}
+  <section class="order-admin-page">
+    <a class="order-back-link" href="{{ url_for('shop.admin_orders') }}">← Back to orders</a>
+    <div class="admin-page-heading">
+      <div>
+        <p class="eyebrow">COD ORDER · {{ order.public_reference }}</p>
+        <h1>Order #{{ order.id }}</h1>
+      </div>
+      <div class="admin-order-status">
+        <span class="order-status">{{ status_labels[order.status] }}</span>
+        <span>{{ "Payment collected" if order.payment_status == "collected" else "Cash on Delivery · unpaid" }}</span>
+      </div>
+    </div>
+    <div class="admin-order-layout">
+      <section class="admin-order-card">
+        <h2>Items</h2>
+        {% for item in order.items %}
+          <div class="admin-order-item">
+            <div>
+              <strong>{{ item.product_name }}</strong>
+              <span>{{ item.product_sku }}{% if item.product_size %} · Size {{ item.product_size }}{% endif %}</span>
+              <span>Qty {{ item.quantity }} × ₱{{ "{:,.2f}".format(item.unit_price) }}</span>
+            </div>
+            <strong>₱{{ "{:,.2f}".format(item.unit_price * item.quantity) }}</strong>
+          </div>
+        {% endfor %}
+        <div class="admin-order-total">
+          <span>Subtotal</span><strong>₱{{ "{:,.2f}".format(order.subtotal) }}</strong>
+        </div>
+        <div class="admin-order-total">
+          <span>Delivery fee</span><strong>₱0.00</strong>
+        </div>
+        <div class="admin-order-total grand">
+          <strong>Total</strong><strong>₱{{ "{:,.2f}".format(order.total) }}</strong>
+        </div>
+        {% if order.customer_note %}
+          <div class="admin-order-note"><strong>Customer note</strong><p>{{ order.customer_note }}</p></div>
+        {% endif %}
+      </section>
+      <aside class="admin-order-card">
+        <h2>Customer and delivery</h2>
+        <dl class="admin-order-contact">
+          <dt>Name</dt><dd>{{ order.customer_name }}</dd>
+          <dt>Email</dt><dd><a href="mailto:{{ order.customer_email }}">{{ order.customer_email }}</a></dd>
+          <dt>Phone</dt><dd><a href="tel:{{ order.customer_phone }}">{{ order.customer_phone }}</a></dd>
+          <dt>Address</dt><dd>{{ order.delivery_address }}</dd>
+          <dt>Placed</dt><dd>{{ order.created_at.strftime("%b %d, %Y · %I:%M %p") }}</dd>
+        </dl>
+      </aside>
+    </div>
+    <section class="admin-order-card order-update-card">
+      <h2>Update order</h2>
+      <p>Move an order through its next status. Cancellation restores reserved stock once.</p>
+      <form method="post" action="{{ url_for('shop.update_admin_order', order_id=order.id) }}" class="order-update-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>
+          Order status
+          <select name="status">
+            <option value="{{ order.status }}">{{ status_labels[order.status] }} (current)</option>
+            {% for status in next_statuses %}
+              <option value="{{ status }}">{{ status_labels[status] }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% if order.payment_status == "collected" %}
+          <p class="collected-label">COD payment collected. A completed sale is linked to this order.</p>
+          <input type="hidden" name="payment_status" value="collected">
+        {% elif order.status == "delivered" or "delivered" in next_statuses %}
+          <label class="collect-payment">
+            <input type="checkbox" name="payment_status" value="collected">
+            Confirm COD cash was collected
+          </label>
+        {% endif %}
+        <button class="button primary" type="submit">Save order update</button>
+      </form>
+      <p class="order-accounting-note">
+        Revenue enters Sales and reports only when the order is delivered and payment is collected.
+      </p>
+    </section>
+  </section>
+{% endblock %}

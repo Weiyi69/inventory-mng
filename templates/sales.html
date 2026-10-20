@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Sales{% endblock %}
+{% block breadcrumb %}Sales{% endblock %}
+{% block page_styles %}
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/sales.css') }}"
+  >
+{% endblock %}
+
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">POINT OF SALE</p>
+      <h1>Sales</h1>
+      <p class="subheading">
+        Ring up a sale and keep your stock in sync.
+      </p>
+    </div>
+  </div>
+
+  <div class="sales-layout">
+    {% if can_process %}
+    <section class="panel pos-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>New transaction</h2>
+          <p>Scan a barcode or search your products.</p>
+        </div>
+        <span class="live-indicator"><i></i> Ready</span>
+      </div>
+      <div class="pos-search">
+        <span>⌕</span>
+        <input
+          id="product-search"
+          type="search"
+          placeholder="Search name, SKU, size, color, or scan barcode..."
+          autocomplete="off"
+        >
+        <div id="product-results" class="product-results hidden"></div>
+      </div>
+      <div id="cart-items" class="cart-items">
+        <div class="empty-state">
+          Your cart is empty. Search for a product to get started.
+        </div>
+      </div>
+      <div class="cart-footer">
+        <div class="tender-row">
+          <label for="amount-tendered">Cash received (₱)</label>
+          <input
+            id="amount-tendered"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+          >
+        </div>
+        <div class="cart-total">
+          <span>Total due</span>
+          <strong id="cart-total">₱0.00</strong>
+        </div>
+        <div class="cart-total change-preview">
+          <span>Change</span>
+          <strong id="change-due">₱0.00</strong>
+        </div>
+        <button
+          id="checkout-button"
+          class="button primary full-width"
+          type="button"
+          disabled
+        >
+          Complete sale <span>→</span>
+        </button>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="panel transaction-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Recent transactions</h2>
+          <p>Latest activity at your store</p>
+        </div>
+        <span class="result-count">{{ sales|length }} shown</span>
+      </div>
+      {% if sales %}
+        <div class="compact-list">
+          {% for sale in sales %}
+            <a
+              class="compact-row sale-row"
+              href="{{ url_for('sales.invoice', sale_id=sale.id) }}"
+            >
+              <div class="sale-mark">#{{ sale.id }}</div>
+              <div class="row-grow">
+                <strong>Sale #{{ sale.id }}</strong>
+                <small>
+                  {{ sale.created_at.strftime('%b %d, %Y · %H:%M') }}
+                  · {{ sale.items|length }} items
+                </small>
+              </div>
+              <strong>₱{{ "%.2f"|format(sale.total) }}</strong>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">Completed sales will appear here.</div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.retailFlowProducts = {{ products|map(attribute='id')|list|tojson }};
+  window.retailFlowProductData = [
+    {% for product in products %}
+      {
+        id: {{ product.id }},
+        name: {{ product.name|tojson }},
+        sku: {{ product.sku|tojson }},
+        barcode: {{ product.barcode|tojson }},
+        size: {{ product.size|tojson }},
+        color: {{ product.color|tojson }},
+        image: {{
+          (
+            url_for(
+              'products.product_image',
+              filename=product.image_filename
+            )
+            if product.image_filename
+            else none
+          )|tojson
+        }},
+        price: {{ product.price|float }},
+        stock: {{ product.quantity }}
+      }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+</script>
+{% endblock %}
