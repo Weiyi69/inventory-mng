@@ -9,13 +9,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
 </head>
 <body class="catalog-page">
-  <header class="catalog-header">
-    <a class="catalog-brand" href="{{ url_for('products.index') }}">
-      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
-    </a>
-    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
-    <div class="catalog-account"><a href="{{ url_for('products.index') }}">Shop products</a></div>
-  </header>
+  {% include "_shop_header.html" %}
   <main class="shop-main confirmation-main">
     <p class="catalog-eyebrow">ORDER RECEIVED</p>
     <h1 class="shop-title">Thank you, {{ order.customer_name }}.</h1>
@@ -32,7 +26,13 @@
       </div>
       {% for item in order.items %}
         <div class="confirmation-line">
-          <span>{{ item.product_name }} <small>× {{ item.quantity }}</small></span>
+          <span>
+            {{ item.product_name }}
+            {% if item.product_size or item.product_color %}
+              <small>{{ [item.product_size, item.product_color]|select|join(" / ") }}</small>
+            {% endif %}
+            <small>× {{ item.quantity }}</small>
+          </span>
           <span>₱{{ "{:,.2f}".format(item.unit_price * item.quantity) }}</span>
         </div>
       {% endfor %}
@@ -41,6 +41,9 @@
       <div class="confirmation-total"><strong>Total due on delivery</strong><strong>₱{{ "{:,.2f}".format(order.total) }}</strong></div>
       <p class="confirmation-payment">Payment method · Cash on Delivery</p>
     </section>
+    {% if current_user and current_user.role == "user" %}
+      <a class="shop-text-button" href="{{ url_for('shop.customer_orders') }}">View your orders</a>
+    {% endif %}
     <a class="shop-button" href="{{ url_for('products.index') }}">Continue shopping</a>
   </main>
   <footer class="catalog-footer"><span>RETAILFLOW</span><span>Cash on Delivery · Delivery fee ₱0.00</span></footer>

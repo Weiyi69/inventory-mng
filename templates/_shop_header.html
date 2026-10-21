@@ -1,0 +1,60 @@
+<header class="catalog-header">
+  <a class="catalog-brand" href="{{ url_for('products.index') }}">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
+  </a>
+  <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
+  <div class="catalog-account">
+    {% if not current_user or current_user.role == "user" %}
+      <a
+        class="catalog-cart-link"
+        href="{{ url_for('shop.cart') }}"
+        aria-label="Shopping cart, {{ cart_count }} items"
+      >
+        <svg
+          class="catalog-header-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/>
+          <path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/>
+          <circle cx="18" cy="20" r="2"/>
+          <circle cx="8" cy="20" r="2"/>
+        </svg>
+        <span aria-hidden="true">{{ cart_count }}</span>
+      </a>
+    {% endif %}
+    {% if not current_user %}
+      <a href="{{ url_for('web.login', next=request.full_path.rstrip('?')) }}" aria-label="Sign in">
+        <svg
+          class="catalog-header-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </a>
+    {% else %}
+      {% if current_user.role == "user" %}
+        <a href="{{ url_for('shop.customer_orders') }}">My orders</a>
+      {% endif %}
+      <span>{{ current_user.name }}</span>
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Log out</button>
+      </form>
+    {% endif %}
+  </div>
+</header>

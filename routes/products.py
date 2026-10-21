@@ -24,7 +24,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from models import OrderItem, Product, SaleItem, db
+from models import CartItem, OrderItem, Product, SaleItem, db
 from security import access_required, catalog_access
 
 products_bp = Blueprint("products", __name__, url_prefix="/products")
@@ -231,6 +231,9 @@ def delete(product_id):
         )
     else:
         image_filename = product.image_filename
+        CartItem.query.filter_by(product_id=product.id).delete(
+            synchronize_session=False,
+        )
         db.session.delete(product)
         db.session.commit()
         if image_filename:

@@ -19,8 +19,9 @@ from flask_jwt_extended import (
 )
 from flask_jwt_extended.exceptions import JWTDecodeError
 from jwt.exceptions import ExpiredSignatureError
+from sqlalchemy import func
 
-from models import User, db
+from models import Cart, CartItem, User, db
 
 
 def optional_identity():
@@ -63,12 +64,23 @@ def catalog_access(view):
             if user
             else session.setdefault("guest_csrf", secrets.token_urlsafe(32))
         )
-        cart = session.get("cart", {})
-        g.cart_count = (
-            sum(value for value in cart.values() if isinstance(value, int) and value > 0)
-            if isinstance(cart, dict)
-            else 0
-        )
+        if user is None:
+            cart = session.get("cart", {})
+            g.cart_count = (
+                sum(
+                    value
+                    for value in cart.values()
+                    if isinstance(value, int) and value > 0
+                )
+                if isinstance(cart, dict)
+                else 0
+            )
+        elif user.role == "user":
+            g.cart_count = db.session.query(
+                func.coalesce(func.sum(CartItem.quantity), 0)
+            ).join(Cart).filter(Cart.user_id == user.id).scalar()
+        else:
+            g.cart_count = 0
         return discard_invalid_auth_cookies(view(*args, **kwargs))
 
     return wrapped

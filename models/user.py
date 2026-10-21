@@ -77,6 +77,12 @@ class User(db.Model):
     )
     sales = db.relationship("Sale", back_populates="created_by")
     expenses = db.relationship("Expense", back_populates="created_by")
+    cart = db.relationship(
+        "Cart",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
     audit_events = db.relationship(
         "AuditLog",
         back_populates="actor",

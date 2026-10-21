@@ -4,6 +4,42 @@
     if (form && !window.confirm(form.dataset.confirm)) event.preventDefault();
   });
 
+  function syncQuantityStepper(stepper) {
+    const input = stepper.querySelector('input[name="quantity"]');
+    if (!input) return;
+    const value = input.valueAsNumber;
+    const decreaseButton = stepper.querySelector('[data-quantity-step="-1"]');
+    const increaseButton = stepper.querySelector('[data-quantity-step="1"]');
+    if (decreaseButton) {
+      decreaseButton.disabled = !Number.isFinite(value) || value <= Number(input.min);
+    }
+    if (increaseButton) {
+      increaseButton.disabled = Number.isFinite(value) && value >= Number(input.max);
+    }
+  }
+
+  document.querySelectorAll("[data-quantity-stepper]").forEach(syncQuantityStepper);
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest("[data-quantity-step]");
+    const stepper = button?.closest("[data-quantity-stepper]");
+    const input = stepper?.querySelector('input[name="quantity"]');
+    if (!button || !stepper || !input) return;
+
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const current = input.valueAsNumber;
+    const value = Number.isFinite(current) ? current : min;
+    const nextValue = value + Number(button.dataset.quantityStep);
+    input.value = String(Math.min(max, Math.max(min, nextValue)));
+    syncQuantityStepper(stepper);
+  });
+  document.addEventListener("input", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const stepper = event.target.closest("[data-quantity-stepper]");
+    if (stepper) syncQuantityStepper(stepper);
+  });
+
   const search = document.getElementById("product-search");
   const results = document.getElementById("product-results");
   const cartElement = document.getElementById("cart-items");

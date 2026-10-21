@@ -333,9 +333,10 @@ def test_regular_user_product_detail_is_read_only_and_uses_supported_fields(auth
     assert b"Description" not in detail.data
     assert b"color-swatch" not in detail.data.lower()
     assert b"more colours" not in detail.data.lower()
-    assert b"add to cart" not in detail.data.lower()
-    assert b"buy it now" not in detail.data.lower()
-    assert b'name="quantity"' not in detail.data
+    assert b"add to cart" in detail.data.lower()
+    assert b"buy it now" in detail.data.lower()
+    assert detail.data.count(b'name="quantity"') == 1
+    assert b'data-quantity-stepper' in detail.data
     assert missing.status_code == 404
     assert inactive.status_code == 404
 

@@ -10,16 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
 </head>
 <body class="catalog-page">
-  <header class="catalog-header">
-    <a class="catalog-brand" href="{{ url_for('products.index') }}">
-      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
-    </a>
-    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
-    <div class="catalog-account">
-      <a href="{{ url_for('shop.cart') }}">Back to bag</a>
-      <a href="{{ url_for('products.index') }}">Continue shopping</a>
-    </div>
-  </header>
+  {% include "_shop_header.html" %}
   <main class="shop-main">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -40,12 +31,14 @@
         <input type="hidden" name="intent_signature" value="{{ intent_signature }}">
         <label>
           Full name
-          <input name="customer_name" autocomplete="name" maxlength="120" required>
+          <input name="customer_name" autocomplete="name" maxlength="120"
+            value="{{ customer.name if customer else '' }}" required>
         </label>
         <div class="checkout-form-row">
           <label>
             Email address
-            <input type="email" name="customer_email" autocomplete="email" maxlength="254" required>
+            <input type="email" name="customer_email" autocomplete="email" maxlength="254"
+              value="{{ customer.email if customer else '' }}" required>
           </label>
           <label>
             Phone number
@@ -76,6 +69,11 @@
             <span>{{ entry.product.name }} <small>× {{ entry.quantity }}</small></span>
             <span>₱{{ "{:,.2f}".format(entry.line_total) }}</span>
           </div>
+          {% if entry.product.size or entry.product.color %}
+            <small class="checkout-variant">
+              {{ [entry.product.size, entry.product.color]|select|join(" / ") }}
+            </small>
+          {% endif %}
         {% endfor %}
         <div><span>Subtotal</span><span>₱{{ "{:,.2f}".format(subtotal) }}</span></div>
         <div><span>Delivery fee</span><span>₱0.00</span></div>

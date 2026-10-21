@@ -24,26 +24,7 @@
   >
 </head>
 <body class="catalog-page">
-  <header class="catalog-header">
-    <a class="catalog-brand" href="{{ url_for('products.index') }}">
-      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
-    </a>
-    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
-    <div class="catalog-account">
-      {% if not current_user %}
-        <a class="catalog-cart-link" href="{{ url_for('shop.cart') }}">
-          Bag <span>{{ cart_count }}</span>
-        </a>
-        <a href="{{ url_for('web.login') }}">Sign in</a>
-      {% else %}
-        <span>{{ current_user.name }}</span>
-        <form method="post" action="{{ url_for('auth.logout') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button type="submit">Log out</button>
-        </form>
-      {% endif %}
-    </div>
-  </header>
+  {% include "_shop_header.html" %}
 
   <main class="catalog-main">
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -96,41 +77,63 @@
         <p class="detail-eyebrow">{{ product.category }}</p>
         <h1>{{ product.name }}</h1>
         <p class="detail-price">₱{{ "{:,.2f}".format(product.price) }}</p>
-        {% if not current_user %}
-          <p class="detail-public-availability">
-            {{ "Available" if product.quantity > 0 else "Currently unavailable" }}
-          </p>
+        {% if not current_user or current_user.role == "user" %}
+          {% if not current_user %}
+            <p class="detail-public-availability">
+              {{ "Available" if product.quantity > 0 else "Currently unavailable" }}
+            </p>
+          {% elif product.quantity == 0 %}
+            <p class="detail-public-availability">Currently unavailable</p>
+          {% endif %}
           {% if product.quantity > 0 %}
             <div class="shop-product-actions">
-              <form method="post" action="{{ url_for('shop.add_to_cart', product_id=product.id) }}">
+              <form
+                method="post"
+                action="{{ url_for('shop.add_to_cart', product_id=product.id) }}"
+              >
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <label for="cart-quantity">Quantity</label>
-                <input
-                  id="cart-quantity"
-                  type="number"
-                  name="quantity"
-                  min="1"
-                  max="99"
-                  value="1"
-                  required
-                >
-                <button class="shop-button secondary" type="submit">Add to Bag</button>
+                <label for="cart-quantity">Quantity:</label>
+                <div class="shop-quantity-control" data-quantity-stepper>
+                  <button
+                    type="button"
+                    data-quantity-step="-1"
+                    aria-label="Decrease quantity"
+                    disabled
+                  >−</button>
+                  <input
+                    id="cart-quantity"
+                    type="number"
+                    name="quantity"
+                    min="1"
+                    max="{{ [product.quantity, 99]|min }}"
+                    step="1"
+                    value="1"
+                    required
+                  >
+                  <button
+                    type="button"
+                    data-quantity-step="1"
+                    aria-label="Increase quantity"
+                  >+</button>
+                </div>
+                {% if product.quantity <= product.low_stock_threshold %}
+                  <p class="shop-limited-stock" role="status">
+                    <span aria-hidden="true">!</span> Limited pieces
+                  </p>
+                {% endif %}
+                <div class="shop-purchase-buttons">
+                  <button class="shop-button secondary" type="submit">
+                    Add to cart
+                  </button>
+                  <button
+                    class="shop-button"
+                    type="submit"
+                    formaction="{{ url_for('shop.buy_now', product_id=product.id) }}"
+                  >
+                    Buy it now
+                  </button>
+                </div>
               </form>
-              <form method="post" action="{{ url_for('shop.buy_now', product_id=product.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <label for="buy-now-quantity">Quantity</label>
-                <input
-                  id="buy-now-quantity"
-                  type="number"
-                  name="quantity"
-                  min="1"
-                  max="99"
-                  value="1"
-                  required
-                >
-                <button class="shop-button" type="submit">Buy It Now · Cash on Delivery</button>
-              </form>
-              <p>Cash on Delivery. Delivery fee: ₱0.00.</p>
             </div>
           {% endif %}
         {% endif %}
@@ -246,5 +249,6 @@
   {% if current_user %}
     <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
   {% endif %}
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

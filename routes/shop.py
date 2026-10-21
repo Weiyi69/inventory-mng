@@ -19,10 +19,21 @@ from flask import (
     session,
     url_for,
 )
+from flask_jwt_extended import get_jwt
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from extensions import limiter
-from models import Order, OrderItem, Product, Sale, SaleItem, db
+from models import (
+    Cart,
+    CartItem,
+    Order,
+    OrderItem,
+    Product,
+    Sale,
+    SaleItem,
+    User,
+    db,
+)
 from security import (
     access_required,
     audit_event,
@@ -47,17 +58,134 @@ class InventoryConflict(ValueError):
     pass
 
 
-def _guest_only(view):
+def _cart_for_user(user, create=False):
+    cart = Cart.query.filter_by(user_id=user.id).first()
+    if cart is None and create:
+        cart = Cart(user_id=user.id)
+        db.session.add(cart)
+        db.session.flush()
+    return cart
+
+
+def _read_user_cart(user):
+    cart = _cart_for_user(user)
+    if cart is None:
+        return {}
+    return {
+        str(item.product_id): item.quantity
+        for item in cart.items
+        if 1 <= item.quantity <= MAX_ITEM_QUANTITY
+    }
+
+
+def merge_guest_cart(user, guest_cart):
+    if not isinstance(guest_cart, dict) or not guest_cart:
+        return None
+
+    items = _read_user_cart(user)
+    skipped = 0
+    limited = 0
+    for raw_id, raw_quantity in list(guest_cart.items())[:MAX_CART_ITEMS]:
+        try:
+            product_id = int(raw_id)
+            quantity = int(raw_quantity)
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+        if product_id < 1 or not 1 <= quantity <= MAX_ITEM_QUANTITY:
+            skipped += 1
+            continue
+
+        product = _cart_product(product_id)
+        if product is None or product.quantity < 1:
+            skipped += 1
+            continue
+        key = str(product_id)
+        if key not in items and len(items) >= MAX_CART_ITEMS:
+            skipped += 1
+            continue
+
+        requested = items.get(key, 0) + quantity
+        merged = min(requested, product.quantity, MAX_ITEM_QUANTITY)
+        if merged < requested:
+            limited += 1
+        if merged > 0:
+            items[key] = merged
+
+    _save_user_cart(user, items)
+    notes = ["Your guest cart was merged into your account."]
+    if limited:
+        notes.append(f"{limited} item quantity was limited to available stock.")
+    if skipped:
+        notes.append(f"{skipped} unavailable or excess cart item(s) were skipped.")
+    return " ".join(notes)
+
+
+def _read_current_cart():
+    if g.current_user is None:
+        return _read_cart()
+    return _read_user_cart(g.current_user)
+
+
+def _save_user_cart(user, items):
+    cart = _cart_for_user(user, create=bool(items))
+    if cart is None:
+        return
+    existing = {item.product_id: item for item in cart.items}
+    normalized = {
+        int(product_id): quantity
+        for product_id, quantity in items.items()
+        if int(product_id) > 0 and 1 <= quantity <= MAX_ITEM_QUANTITY
+    }
+    for product_id, item in existing.items():
+        if product_id not in normalized:
+            db.session.delete(item)
+        else:
+            item.quantity = normalized[product_id]
+    for product_id, quantity in normalized.items():
+        if product_id not in existing:
+            db.session.add(CartItem(
+                cart=cart,
+                product_id=product_id,
+                quantity=quantity,
+            ))
+
+
+def _persist_current_cart(items):
+    if g.current_user is None:
+        session["cart"] = items
+    else:
+        _save_user_cart(g.current_user, items)
+        db.session.commit()
+
+
+def _current_cart_count():
+    cart = _read_current_cart()
+    return sum(cart.values())
+
+
+def _shop_access(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if optional_identity() is not None:
-            abort(403)
-        g.current_user = None
-        g.csrf_token = session.setdefault(
-            "guest_csrf",
-            secrets.token_urlsafe(32),
-        )
-        g.cart_count = sum(_read_cart().values())
+        identity = optional_identity()
+        user = None
+        if identity is not None:
+            try:
+                user = db.session.get(User, int(identity))
+            except (TypeError, ValueError):
+                abort(401)
+            if user is None or not user.is_active:
+                abort(401)
+            if user.role != "user" or not user.allows("products"):
+                abort(403)
+            g.csrf_token = get_jwt().get("csrf", "")
+        else:
+            g.csrf_token = session.setdefault(
+                "guest_csrf",
+                secrets.token_urlsafe(32),
+            )
+        g.current_user = user
+        g.cart_count = _current_cart_count()
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             supplied = (
                 request.headers.get("X-CSRF-TOKEN")
@@ -65,6 +193,32 @@ def _guest_only(view):
             )
             if not hmac.compare_digest(g.csrf_token, supplied):
                 abort(400, description="Your form expired. Please try again.")
+        return discard_invalid_auth_cookies(view(*args, **kwargs))
+
+    return wrapped
+
+
+def _authenticated_shop_user(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        identity = optional_identity()
+        if identity is None:
+            response = redirect(url_for(
+                "web.login",
+                next=request.full_path.rstrip("?"),
+            ))
+            return discard_invalid_auth_cookies(response)
+        try:
+            user = db.session.get(User, int(identity))
+        except (TypeError, ValueError):
+            abort(401)
+        if user is None or not user.is_active:
+            abort(401)
+        if user.role != "user" or not user.allows("products"):
+            abort(403)
+        g.current_user = user
+        g.csrf_token = get_jwt().get("csrf", "")
+        g.cart_count = sum(_read_user_cart(user).values())
         return discard_invalid_auth_cookies(view(*args, **kwargs))
 
     return wrapped
@@ -124,14 +278,20 @@ def _invalidate_checkout():
     session.pop("checkout_intent", None)
 
 
-def _clear_submitted_checkout(key, payload, intent):
+def _clear_submitted_checkout(key, payload, intent, user=None):
     if (
         session.get("checkout_key") != key
         or session.get("checkout_intent") != payload
     ):
         return
     if intent["source"] == "cart":
-        session["cart"] = {}
+        if user is None:
+            session["cart"] = {}
+        else:
+            cart = _cart_for_user(user)
+            if cart:
+                cart.items.clear()
+                db.session.commit()
     else:
         session.pop("buy_now", None)
     _invalidate_checkout()
@@ -195,8 +355,10 @@ def _parse_intent(payload):
     return {"source": intent["source"], "items": parsed}
 
 
-def _checkout_digest(intent, customer):
+def _checkout_digest(intent, customer, user_id=None):
     content = {"intent": intent, "customer": customer}
+    if user_id is not None:
+        content["user_id"] = user_id
     secret = current_app.config["SECRET_KEY"].encode("utf-8")
     return hmac.new(
         secret,
@@ -244,9 +406,9 @@ def _checkout_error(message):
 
 
 @shop_bp.get("/cart/")
-@_guest_only
+@_shop_access
 def cart():
-    entries, subtotal = _cart_entries(_read_cart())
+    entries, subtotal = _cart_entries(_read_current_cart())
     return render_template(
         "cart.html",
         entries=entries,
@@ -257,14 +419,14 @@ def cart():
 
 @shop_bp.post("/cart/add/<int:product_id>/")
 @limiter.limit("60 per hour")
-@_guest_only
+@_shop_access
 def add_to_cart(product_id):
     product = _cart_product(product_id)
     if product is None:
         abort(404)
     try:
         quantity = _valid_quantity(request.form.get("quantity", "1"))
-        cart_items = _read_cart()
+        cart_items = _read_current_cart()
         new_quantity = cart_items.get(str(product.id), 0) + quantity
         if new_quantity > MAX_ITEM_QUANTITY or new_quantity > product.quantity:
             raise ValueError(f"Not enough stock is available for {product.name}.")
@@ -274,17 +436,17 @@ def add_to_cart(product_id):
         flash(str(error), "error")
         return redirect(url_for("products.view_product", product_id=product.id))
     cart_items[str(product.id)] = new_quantity
-    session["cart"] = cart_items
+    _persist_current_cart(cart_items)
     _invalidate_checkout()
-    flash(f"{product.name} added to your bag.", "success")
+    flash(f"{product.name} added to your cart.", "success")
     return redirect(url_for("products.view_product", product_id=product.id))
 
 
 @shop_bp.post("/cart/items/<int:product_id>/update/")
 @limiter.limit("60 per hour")
-@_guest_only
+@_shop_access
 def update_cart_item(product_id):
-    cart_items = _read_cart()
+    cart_items = _read_current_cart()
     if str(product_id) not in cart_items:
         abort(404)
     product = _cart_product(product_id)
@@ -295,7 +457,7 @@ def update_cart_item(product_id):
         if quantity > product.quantity:
             raise ValueError(f"Not enough stock is available for {product.name}.")
         cart_items[str(product_id)] = quantity
-        session["cart"] = cart_items
+        _persist_current_cart(cart_items)
         _invalidate_checkout()
         flash("Cart updated.", "success")
     except ValueError as error:
@@ -305,19 +467,19 @@ def update_cart_item(product_id):
 
 @shop_bp.post("/cart/items/<int:product_id>/remove/")
 @limiter.limit("60 per hour")
-@_guest_only
+@_shop_access
 def remove_cart_item(product_id):
-    cart_items = _read_cart()
+    cart_items = _read_current_cart()
     cart_items.pop(str(product_id), None)
-    session["cart"] = cart_items
+    _persist_current_cart(cart_items)
     _invalidate_checkout()
-    flash("Item removed from your bag.", "success")
+    flash("Item removed from your cart.", "success")
     return redirect(url_for("shop.cart"))
 
 
 @shop_bp.post("/buy-now/<int:product_id>/")
 @limiter.limit("30 per hour")
-@_guest_only
+@_shop_access
 def buy_now(product_id):
     product = _cart_product(product_id)
     if product is None:
@@ -336,7 +498,7 @@ def buy_now(product_id):
 
 
 @shop_bp.get("/checkout/")
-@_guest_only
+@_shop_access
 def checkout():
     buy_now_item = session.get("buy_now")
     if (
@@ -353,10 +515,10 @@ def checkout():
         source = "cart"
         raw_items = [
             {"id": int(product_id), "quantity": quantity}
-            for product_id, quantity in _read_cart().items()
+            for product_id, quantity in _read_current_cart().items()
         ]
     if not raw_items:
-        flash("Your bag is empty.", "error")
+        flash("Your cart is empty.", "error")
         return redirect(url_for("shop.cart"))
 
     intent = _parse_intent(_canonical_json({"source": source, "items": raw_items}))
@@ -374,7 +536,7 @@ def checkout():
                 session.pop("buy_now", None)
                 flash("This product is no longer available.", "error")
                 return redirect(url_for("products.index"))
-            flash("A product in your bag is no longer available.", "error")
+            flash("A product in your cart is no longer available.", "error")
             return redirect(url_for("shop.cart"))
         if item["quantity"] > product.quantity:
             if source == "buy_now":
@@ -402,12 +564,13 @@ def checkout():
         intent_payload=payload,
         intent_signature=_sign_intent(key, payload),
         csrf_token=g.csrf_token,
+        customer=g.current_user,
     )
 
 
 @shop_bp.post("/checkout/")
 @limiter.limit("10 per hour")
-@_guest_only
+@_shop_access
 def place_order():
     key = request.form.get("idempotency_key", "").strip()
     payload = request.form.get("intent_payload", "")
@@ -416,15 +579,20 @@ def place_order():
         _sign_intent(key, payload),
         signature,
     ):
-        return _checkout_error("Your checkout form expired. Please review your bag.")
+        return _checkout_error("Your checkout form expired. Please review your cart.")
     try:
         intent = _parse_intent(payload)
         customer = _customer_fields(request.form)
     except ValueError as error:
         return _checkout_error(str(error))
-    digest = _checkout_digest(intent, customer)
+    user_id = g.current_user.id if g.current_user else None
+    digest = _checkout_digest(intent, customer, user_id=user_id)
     existing = Order.query.filter_by(idempotency_key=key).first()
     if existing:
+        if existing.user_id != user_id:
+            return _checkout_error(
+                "This checkout was already submitted. Please start a new checkout."
+            )
         if not hmac.compare_digest(existing.request_digest, digest):
             if (
                 session.get("checkout_key") == key
@@ -436,7 +604,7 @@ def place_order():
                 "Please start a new checkout."
             )
 
-        _clear_submitted_checkout(key, payload, intent)
+        _clear_submitted_checkout(key, payload, intent, g.current_user)
         return redirect(
             url_for("shop.order_confirmation", reference=existing.public_reference),
             code=303,
@@ -451,7 +619,7 @@ def place_order():
         ).all()
     }
     if len(products) != len(ids):
-        return _checkout_error("A product in your bag is no longer available.")
+        return _checkout_error("A product in your cart is no longer available.")
 
     try:
         subtotal = Decimal("0.00")
@@ -459,6 +627,7 @@ def place_order():
             public_reference=Order.new_public_reference(),
             idempotency_key=key,
             request_digest=digest,
+            user_id=user_id,
             customer_name=customer["name"],
             customer_email=customer["email"],
             customer_phone=customer["phone"],
@@ -484,7 +653,7 @@ def place_order():
             if changed != 1:
                 raise InventoryConflict(
                     f"Not enough stock is available for {product.name}. "
-                    "Please review your bag."
+                    "Please review your cart."
                 )
             unit_price = Decimal(product.price).quantize(Decimal("0.01"))
             unit_cost = Decimal(product.cost).quantize(Decimal("0.01"))
@@ -507,8 +676,12 @@ def place_order():
     except IntegrityError:
         db.session.rollback()
         existing = Order.query.filter_by(idempotency_key=key).first()
-        if existing and hmac.compare_digest(existing.request_digest, digest):
-            _clear_submitted_checkout(key, payload, intent)
+        if (
+            existing
+            and existing.user_id == user_id
+            and hmac.compare_digest(existing.request_digest, digest)
+        ):
+            _clear_submitted_checkout(key, payload, intent, g.current_user)
             return redirect(
                 url_for("shop.order_confirmation", reference=existing.public_reference),
                 code=303,
@@ -519,20 +692,28 @@ def place_order():
         if "locked" not in str(error).lower():
             raise
         existing = Order.query.filter_by(idempotency_key=key).first()
-        if existing and hmac.compare_digest(existing.request_digest, digest):
-            _clear_submitted_checkout(key, payload, intent)
+        if (
+            existing
+            and existing.user_id == user_id
+            and hmac.compare_digest(existing.request_digest, digest)
+        ):
+            _clear_submitted_checkout(key, payload, intent, g.current_user)
             return redirect(
                 url_for("shop.order_confirmation", reference=existing.public_reference),
                 code=303,
             )
         return _checkout_error(
-            "Inventory changed while placing your order. Please review your bag.",
+            "Inventory changed while placing your order. Please review your cart.",
         )
     except InventoryConflict as error:
         db.session.rollback()
         existing = Order.query.filter_by(idempotency_key=key).first()
-        if existing and hmac.compare_digest(existing.request_digest, digest):
-            _clear_submitted_checkout(key, payload, intent)
+        if (
+            existing
+            and existing.user_id == user_id
+            and hmac.compare_digest(existing.request_digest, digest)
+        ):
+            _clear_submitted_checkout(key, payload, intent, g.current_user)
             return redirect(
                 url_for("shop.order_confirmation", reference=existing.public_reference),
                 code=303,
@@ -542,7 +723,7 @@ def place_order():
         db.session.rollback()
         return _checkout_error(str(error))
 
-    _clear_submitted_checkout(key, payload, intent)
+    _clear_submitted_checkout(key, payload, intent, g.current_user)
     return redirect(
         url_for("shop.order_confirmation", reference=order.public_reference),
         code=303,
@@ -550,18 +731,55 @@ def place_order():
 
 
 @shop_bp.get("/orders/<string:reference>/confirmation/")
-@_guest_only
+@_shop_access
 def order_confirmation(reference):
     if not re.fullmatch(r"[A-Za-z0-9_-]{30,48}", reference):
         abort(404)
-    order = Order.query.filter_by(public_reference=reference).first_or_404()
+    order_query = Order.query.filter_by(public_reference=reference)
+    if g.current_user is None:
+        order_query = order_query.filter(Order.user_id.is_(None))
+    else:
+        order_query = order_query.filter_by(user_id=g.current_user.id)
+    order = order_query.first_or_404()
     response = current_app.make_response(render_template(
         "order_confirmation.html",
         order=order,
         status_label=STATUS_LABELS[order.status],
+        is_customer=True,
     ))
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@shop_bp.get("/orders/")
+@_authenticated_shop_user
+def customer_orders():
+    orders = (
+        Order.query.filter_by(user_id=g.current_user.id)
+        .order_by(Order.created_at.desc(), Order.id.desc())
+        .limit(100)
+        .all()
+    )
+    return render_template(
+        "customer_orders.html",
+        orders=orders,
+        status_labels=STATUS_LABELS,
+    )
+
+
+@shop_bp.get("/orders/<int:order_id>/")
+@_authenticated_shop_user
+def customer_order_detail(order_id):
+    order = Order.query.filter_by(
+        id=order_id,
+        user_id=g.current_user.id,
+    ).first_or_404()
+    return render_template(
+        "order_confirmation.html",
+        order=order,
+        status_label=STATUS_LABELS[order.status],
+        is_customer=True,
+    )
 
 
 @shop_bp.get("/admin/orders/")

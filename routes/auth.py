@@ -7,6 +7,7 @@ from flask import (
     Blueprint,
     abort,
     current_app,
+    flash,
     g,
     jsonify,
     redirect,
@@ -45,9 +46,9 @@ def _login_error(message):
     ), 401
 
 
-def _safe_next(value):
+def _safe_next(value, fallback=None):
     if not value:
-        return url_for("dashboard.index")
+        return fallback or url_for("dashboard.index")
     parsed = urlsplit(value)
     if (
         parsed.scheme
@@ -58,7 +59,7 @@ def _safe_next(value):
         or "\r" in value
         or "\n" in value
     ):
-        return url_for("dashboard.index")
+        return fallback or url_for("dashboard.index")
     return value
 
 
@@ -94,15 +95,24 @@ def login():
         identity=str(user.id),
         additional_claims={"role": user.role, "auth_version": user.auth_version},
     )
+    merge_notice = None
+    if user.role == "user":
+        from routes.shop import merge_guest_cart
+
+        merge_notice = merge_guest_cart(user, session.get("cart", {}))
     audit_event("login_succeeded", actor=user)
     db.session.commit()
     session.clear()
-    if user.role == "admin":
-        destination = _safe_next(
-            request.args.get("next") or request.form.get("next")
-        )
-    else:
-        destination = url_for("products.index")
+    destination = _safe_next(
+        request.args.get("next") or request.form.get("next"),
+        fallback=(
+            url_for("dashboard.index")
+            if user.role == "admin"
+            else url_for("products.index")
+        ),
+    )
+    if merge_notice:
+        flash(merge_notice, "success")
     response = redirect(destination)
     set_access_cookies(response, access_token)
     set_refresh_cookies(response, refresh_token)
@@ -186,6 +196,9 @@ def logout():
             ))
     audit_event("logout", actor=user)
     db.session.commit()
+    session.pop("buy_now", None)
+    session.pop("checkout_key", None)
+    session.pop("checkout_intent", None)
     response = redirect(url_for("web.login"))
     unset_jwt_cookies(response)
     return response

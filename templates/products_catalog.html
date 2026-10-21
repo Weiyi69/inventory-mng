@@ -20,26 +20,7 @@
   >
 </head>
 <body class="catalog-page">
-  <header class="catalog-header">
-    <a class="catalog-brand" href="{{ url_for('products.index') }}">
-      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
-    </a>
-    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
-    <div class="catalog-account">
-      {% if not current_user %}
-        <a class="catalog-cart-link" href="{{ url_for('shop.cart') }}">
-          Bag <span>{{ cart_count }}</span>
-        </a>
-        <a href="{{ url_for('web.login') }}">Sign in</a>
-      {% else %}
-        <span>{{ current_user.name }}</span>
-        <form method="post" action="{{ url_for('auth.logout') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button type="submit">Log out</button>
-        </form>
-      {% endif %}
-    </div>
-  </header>
+  {% include "_shop_header.html" %}
 
   <main class="catalog-main">
     {% with messages = get_flashed_messages(with_categories=true) %}

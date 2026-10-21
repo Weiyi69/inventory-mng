@@ -10,7 +10,7 @@ from PIL import Image
 
 from app import create_app
 from config import Config
-from models import Order, Product, Sale, SaleItem, User, db
+from models import CartItem, Order, Product, Sale, SaleItem, User, db
 
 
 class ShopTestConfig(Config):
@@ -125,15 +125,51 @@ def test_public_catalog_detail_and_product_images_are_available(shop_app):
     with shop_app.test_client() as client:
         catalog = client.get("/products/")
         detail = client.get("/products/1/view/")
+        cart = client.get("/cart/")
         image = client.get(f"/products/images/{filename}")
 
-    assert catalog.status_code == detail.status_code == image.status_code == 200
+    assert catalog.status_code == detail.status_code == cart.status_code == image.status_code == 200
     assert b"Navy Hoodie" in catalog.data and "₱1,250.00".encode() in catalog.data
     assert b"cost" not in catalog.data.lower()
-    assert b"Add to Bag" in detail.data and b"Buy It Now" in detail.data
+    for page in (catalog, detail, cart):
+        assert b'class="catalog-header-icon"' in page.data
+        assert b'<path d="m2.05 2.05 1.099' in page.data
+        assert b"Bag" not in page.data
+        assert b'aria-label="Shopping cart, 0 items"' in page.data
+        assert b'<span aria-hidden="true">0</span>' in page.data
+    for page in (catalog, detail):
+        assert b'aria-label="Sign in"' in page.data
+        assert b'href="/login?next=' in page.data
+        assert b'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>' in page.data
+    assert b"Add to cart" in detail.data and b"Buy it now" in detail.data
+    assert detail.data.count(b'data-quantity-stepper') == 1
+    assert detail.data.count(b'data-quantity-step="-1"') == 1
+    assert detail.data.count(b'data-quantity-step="1"') == 1
+    assert detail.data.count(b'name="quantity"') == 1
+    assert b'max="5"' in detail.data
+    assert b'action="/cart/add/1/"' in detail.data
+    assert b'formaction="/buy-now/1/"' in detail.data
+    assert b"Limited pieces" not in detail.data
+    assert b'aria-label="Decrease quantity"' in detail.data
+    assert b'aria-label="Increase quantity"' in detail.data
     assert b"color-swatch" not in detail.data.lower()
     assert image.mimetype == "image/jpeg"
     assert client.get("/products/999/view/").status_code == 404
+
+
+def test_product_detail_shows_limited_pieces_at_low_stock(shop_app):
+    with shop_app.app_context():
+        product = db.session.get(Product, 1)
+        product.quantity = 1
+        product.low_stock_threshold = 1
+        db.session.commit()
+
+    with shop_app.test_client() as client:
+        detail = client.get("/products/1/view/")
+
+    assert detail.status_code == 200
+    assert b"Limited pieces" in detail.data
+    assert b'max="1"' in detail.data
 
 
 def test_guest_cart_add_update_remove_and_csrf(shop_app):
@@ -154,8 +190,145 @@ def test_guest_cart_add_update_remove_and_csrf(shop_app):
         removed = _post(client, "/cart/items/1/remove/")
         assert removed.status_code == 302
         empty = client.get("/cart/")
-        assert b"Your bag is empty" in empty.data
+        assert b"Your cart is empty" in empty.data
         assert b"Explore products" in empty.data
+
+
+def test_standard_user_cart_persists_and_merges_guest_cart(shop_app):
+    with shop_app.test_client() as account_client:
+        assert _login(account_client, "staff@example.test").status_code == 302
+        csrf = _csrf(account_client.get("/products/"))
+        account_client.post("/cart/add/1/", data={
+            "csrf_token": csrf,
+            "quantity": "2",
+        })
+
+    with shop_app.test_client() as guest_client:
+        csrf = _csrf(guest_client.get("/products/"))
+        guest_client.post("/cart/add/1/", data={
+            "csrf_token": csrf,
+            "quantity": "1",
+        })
+        assert _login(guest_client, "staff@example.test").status_code == 302
+        cart = guest_client.get("/cart/")
+        assert b"Navy Hoodie" in cart.data
+        assert "₱3,750.00".encode() in cart.data
+        assert b"Shopping cart, 3 items" in cart.data
+        assert b"guest cart was merged" in cart.data
+
+    with shop_app.app_context():
+        assert CartItem.query.one().quantity == 3
+
+    with shop_app.test_client() as returning_client:
+        assert _login(returning_client, "staff@example.test").status_code == 302
+        assert "₱3,750.00".encode() in returning_client.get("/cart/").data
+
+
+def test_standard_user_buy_now_isolated_and_orders_are_private(shop_app):
+    with shop_app.test_client() as client:
+        assert _login(client, "staff@example.test").status_code == 302
+        csrf = _csrf(client.get("/products/"))
+        added = client.post("/cart/add/1/", data={
+            "csrf_token": csrf,
+            "quantity": "1",
+        })
+        assert added.status_code == 302
+        detail = client.get("/products/2/view/")
+        assert b"Add to cart" in detail.data and b"Buy it now" in detail.data
+        csrf = _csrf(detail)
+        bought = client.post("/buy-now/2/", data={
+            "csrf_token": csrf,
+            "quantity": "2",
+        })
+        assert bought.status_code == 302
+        checkout = client.get("/checkout/")
+        assert b"Cotton Tee" in checkout.data
+        assert b"Navy Hoodie" not in checkout.data
+        form = _checkout_form(client)
+        placed = client.post("/checkout/", data=form)
+        assert placed.status_code == 303
+        duplicate = client.post("/checkout/", data=form)
+        assert duplicate.status_code == 303
+        assert duplicate.location == placed.location
+        confirmation = client.get(placed.location)
+        assert confirmation.status_code == 200
+        assert b"Cotton Tee" in confirmation.data
+        assert "₱1,200.00".encode() in confirmation.data
+        history = client.get("/orders/")
+        assert b"Your orders" in history.data
+        match = re.search(rb'href="(/orders/\d+/)"', history.data)
+        assert match
+        detail_page = client.get(match.group(1).decode())
+        assert detail_page.status_code == 200
+        assert b"Cotton Tee" in detail_page.data
+        assert b"Navy Hoodie" in client.get("/cart/").data
+
+    with shop_app.app_context():
+        order = Order.query.one()
+        owner_id = order.user_id
+        order_id = order.id
+        reference = order.public_reference
+        assert owner_id is not None
+        assert order.total == Decimal("1200.00")
+        assert db.session.get(Product, 1).quantity == 5
+        assert db.session.get(Product, 2).quantity == 1
+        other_user = User(
+            name="Another customer",
+            email="another@example.test",
+            role="user",
+        )
+        other_user.set_password("correct-horse-battery")
+        db.session.add(other_user)
+        db.session.commit()
+
+    with shop_app.test_client() as other_client:
+        assert _login(other_client, "another@example.test").status_code == 302
+        assert other_client.get(f"/orders/{order_id}/").status_code == 404
+        assert other_client.get(
+            f"/orders/{reference}/confirmation/"
+        ).status_code == 404
+
+
+def test_shop_pages_redirect_to_sign_in_and_standard_users_cannot_administer(shop_app):
+    with shop_app.test_client() as guest:
+        response = guest.get("/orders/")
+        assert response.status_code == 302
+        assert response.location.startswith("/login?next=/orders/")
+        login_page = guest.get(response.location)
+        signed_in = guest.post(response.location, data={
+            "csrf_token": _csrf(login_page),
+            "email": "staff@example.test",
+            "password": "correct-horse-battery",
+        })
+        assert signed_in.status_code == 302
+        assert signed_in.location == "/orders/"
+
+    with shop_app.test_client() as user:
+        assert _login(user, "staff@example.test").status_code == 302
+        csrf = _csrf(user.get("/products/"))
+        assert user.get("/orders/").status_code == 200
+        assert user.get("/admin/orders/").status_code == 403
+        assert user.get("/expenses/").location == "/products/"
+        assert user.get("/sales/").location == "/products/"
+        oversold = user.post("/cart/add/1/", data={
+            "csrf_token": csrf,
+            "quantity": "6",
+        })
+        assert oversold.status_code == 302
+        with shop_app.app_context():
+            assert CartItem.query.count() == 0
+        added = user.post("/cart/add/1/", data={
+            "csrf_token": csrf,
+            "quantity": "1",
+        })
+        assert added.status_code == 302, added.get_data(as_text=True)
+        rejected = user.post("/cart/add/1/", data={
+            "csrf_token": "invalid",
+            "quantity": "1",
+        })
+        assert rejected.status_code == 302
+        with shop_app.app_context():
+            assert CartItem.query.one().quantity == 1
 
 
 def test_buy_now_bypasses_cart_and_checkout_uses_current_database_prices(shop_app):
@@ -328,11 +501,11 @@ def test_cancellation_restores_reserved_stock_once_and_orders_are_admin_only(sho
         assert db.session.get(Product, 1).quantity == 3
     with shop_app.test_client() as regular_user:
         assert _login(regular_user, "staff@example.test").status_code == 302
-        assert regular_user.get("/cart/").status_code == 403
+        assert regular_user.get("/cart/").status_code == 200
         assert regular_user.post("/cart/add/1/", data={
             "csrf_token": _csrf(regular_user.get("/products/")),
             "quantity": "1",
-        }).status_code == 403
+        }).status_code == 302
         assert regular_user.get("/admin/orders/").status_code == 403
         assert regular_user.get("/sales/").location == "/products/"
 
@@ -367,6 +540,26 @@ def test_products_with_guest_order_history_are_archived_not_deleted(shop_app):
         order = Order.query.one()
         assert product.is_active is False
         assert order.items[0].product_id == product.id
+
+
+def test_deleting_unsold_product_removes_its_persistent_cart_entries(shop_app):
+    with shop_app.test_client() as customer:
+        assert _login(customer, "staff@example.test").status_code == 302
+        csrf = _csrf(customer.get("/products/"))
+        customer.post("/cart/add/1/", data={
+            "csrf_token": csrf,
+            "quantity": "1",
+        })
+
+    with shop_app.test_client() as admin:
+        assert _login(admin, "admin@example.test").status_code == 302
+        csrf = _csrf(admin.get("/products/"))
+        response = admin.post("/products/1/delete", data={"csrf_token": csrf})
+        assert response.status_code == 302
+
+    with shop_app.app_context():
+        assert db.session.get(Product, 1) is None
+        assert CartItem.query.count() == 0
 
 
 def test_shop_css_is_responsive_and_buy_now_has_no_color_selection(shop_app):

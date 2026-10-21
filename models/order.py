@@ -26,6 +26,12 @@ class Order(db.Model):
     public_reference = db.Column(db.String(48), nullable=False, unique=True)
     idempotency_key = db.Column(db.String(64), nullable=False, unique=True)
     request_digest = db.Column(db.String(64), nullable=False)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     customer_name = db.Column(db.String(120), nullable=False)
     customer_email = db.Column(db.String(254), nullable=False)
     customer_phone = db.Column(db.String(32), nullable=False)
@@ -70,6 +76,7 @@ class Order(db.Model):
         cascade="all, delete-orphan",
         order_by="OrderItem.id",
     )
+    user = db.relationship("User")
     sale = db.relationship("Sale", back_populates="order", uselist=False)
 
     @staticmethod

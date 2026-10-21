@@ -1,8 +1,8 @@
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from app import create_app
 from config import Config
-from models import Expense, Order, Product, Sale, SaleItem, db
+from models import Cart, CartItem, Expense, Order, Product, Sale, SaleItem, db
 
 
 def test_auth_migration_preserves_existing_business_records(tmp_path):
@@ -72,3 +72,9 @@ def test_auth_migration_preserves_existing_business_records(tmp_path):
         )
         assert sale.order_id is None
         assert Order.query.count() == 0
+        assert Cart.query.count() == CartItem.query.count() == 0
+        order_columns = {
+            column["name"]
+            for column in inspect(db.engine).get_columns("order")
+        }
+        assert "user_id" in order_columns

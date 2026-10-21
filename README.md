@@ -52,10 +52,10 @@ python -m flask --app app create-admin
 ```
 
 The baseline stamp does not alter tables or data. The migrations add account,
-permission, audit, order, and ownership fields while keeping product, sale,
-sale-item, and expense records. Do not stamp a fresh database; use `db upgrade`
-for a new installation. Set `DATABASE_URL` to use another SQLAlchemy-compatible
-database.
+permission, audit, order, persistent-cart, and order-owner fields while keeping
+product, sale, sale-item, and expense records. Do not stamp a fresh database;
+use `db upgrade` for a new installation. Set `DATABASE_URL` to use another
+SQLAlchemy-compatible database.
 
 For an existing installation already migrated through authentication, back up
 the database and run:
@@ -71,28 +71,34 @@ python -m flask --app app db upgrade
   and individual action/data grants from **User management**.
 - Standard users can access only the responsive Products catalog. They see
   active product photos (or placeholders), names, categories, and PHP prices;
-  they cannot access Overview, Sales, Expenses, Reports, or user management.
+  they can also maintain a persistent cart, check out with Cash on Delivery,
+  and view only their own orders. They cannot access Overview, Sales, Expenses,
+  Reports, or user management.
   Product creation, changes, deletion, restocking, and cost visibility remain
   unavailable unless an administrator explicitly grants the corresponding
   product action. Product stock quantities are shown on the detail page only
   when an administrator grants **View product stock quantities**.
 - Unauthenticated visitors can browse the public active-product catalog and
   detail pages, add available items to a session cart, or use Buy It Now without
-  changing that cart. Checkout is guest-only and Cash on Delivery; delivery fee
-  is ₱0.00. Product prices and stock are revalidated on the server at checkout.
-  The order reserves stock immediately but does not count as a sale until an
-  administrator marks delivery complete and confirms cash collection.
+  changing that cart. Guest checkout remains available with Cash on Delivery;
+  signed-in standard users can use the same checkout with a persistent cart.
+  On sign-in, guest cart items merge into the account cart subject to current
+  stock and quantity limits. Delivery fee is ₱0.00. Product prices and stock
+  are revalidated on the server at checkout. Orders reserve stock immediately
+  but do not count as sales until an administrator marks delivery complete and
+  confirms cash collection.
   Expired or invalid sign-in cookies are cleared on public pages; they do not
   prevent visitors from browsing the catalog.
-- Administrators can review guest orders from **Orders**. Order status moves
+- Administrators can review all orders from **Orders**. Order status moves
   through Pending, Processing, Out for delivery, and Delivered; cancellation
   before delivery restores reserved stock once. A completed Sales record is
   linked to the order only after COD collection, so pending orders do not
   inflate sales, revenue, or profit reports.
 - Catalog cards open a read-only detail page. It shows stored product
-  identifiers and available size/color as plain text; it does not add color
-  selection, size variants, descriptions, size charts, or shipping/return
-  policies that are not stored in the system.
+  identifiers and the product row's fixed size/color as plain text. Each
+  product row represents its own stocked size/color option; the system does not
+  model grouped variant choices, descriptions, size charts, or shipping/return
+  policies that are not stored in the database.
 - Access tokens expire after 15 minutes and refresh tokens rotate for up to
   seven days. Cookies are HttpOnly and same-site; state-changing cookie
   requests require CSRF tokens.
@@ -117,6 +123,8 @@ python -m flask --app app db upgrade
   receipts recording tendered cash and change.
 - JWT-based account authentication, admin/user roles, configurable per-user
   permissions, account activation, and security audit history.
+- Persistent per-user shopping carts, guest-cart merging at sign-in, COD
+  checkout, and account-owned order history.
 
 ## Tests
 

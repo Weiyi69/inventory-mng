@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Your orders · RetailFlow</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/tab-logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/catalog.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
+</head>
+<body class="catalog-page">
+  {% include "_shop_header.html" %}
+  <main class="shop-main">
+    <p class="catalog-eyebrow">YOUR ACCOUNT</p>
+    <h1 class="shop-title">Your orders</h1>
+    {% if orders %}
+      <section class="customer-order-list" aria-label="Your orders">
+        {% for order in orders %}
+          <article class="customer-order">
+            <div>
+              <strong>{{ order.public_reference }}</strong>
+              <span>{{ order.created_at.strftime("%b %d, %Y") }}</span>
+            </div>
+            <div>
+              <span class="order-status">{{ status_labels[order.status] }}</span>
+              <strong>₱{{ "{:,.2f}".format(order.total) }}</strong>
+            </div>
+            <a class="shop-text-button" href="{{ url_for('shop.customer_order_detail', order_id=order.id) }}">
+              View order
+            </a>
+          </article>
+        {% endfor %}
+      </section>
+    {% else %}
+      <section class="shop-empty">
+        <p>You have not placed any orders yet.</p>
+        <a class="shop-button" href="{{ url_for('products.index') }}">Explore products</a>
+      </section>
+    {% endif %}
+  </main>
+  <footer class="catalog-footer">
+    <span>RETAILFLOW</span>
+    <span>Everyday essentials, thoughtfully selected.</span>
+  </footer>
+</body>
+</html>

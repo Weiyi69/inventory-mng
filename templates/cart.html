@@ -4,22 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
-  <title>Your bag · RetailFlow</title>
+  <title>Your cart · RetailFlow</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/tab-logo.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/catalog.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
 </head>
 <body class="catalog-page">
-  <header class="catalog-header">
-    <a class="catalog-brand" href="{{ url_for('products.index') }}">
-      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="RetailFlow">
-    </a>
-    <p class="catalog-tagline">CONSIDERED PIECES. EVERYDAY FORM.</p>
-    <div class="catalog-account">
-      <a href="{{ url_for('products.index') }}">Continue shopping</a>
-      <a class="catalog-cart-link" href="{{ url_for('shop.cart') }}">Bag <span>{{ cart_count }}</span></a>
-    </div>
-  </header>
+  {% include "_shop_header.html" %}
   <main class="shop-main">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -31,7 +22,7 @@
       {% endif %}
     {% endwith %}
     <p class="catalog-eyebrow">YOUR SELECTION</p>
-    <h1 class="shop-title">Your bag</h1>
+    <h1 class="shop-title">Your cart</h1>
     {% if entries %}
       <div class="cart-layout">
         <section class="cart-items" aria-label="Items in your bag">
@@ -53,6 +44,12 @@
                 <h2>{{ entry.product.name if entry.product else "Unavailable product" }}</h2>
                 {% if entry.product %}
                   <p>{{ entry.product.category }}</p>
+                  {% if entry.product.size or entry.product.color %}
+                    <p>
+                      Variant:
+                      {{ [entry.product.size, entry.product.color]|select|join(" / ") }}
+                    </p>
+                  {% endif %}
                   <p>₱{{ "{:,.2f}".format(entry.product.price) }} each</p>
                 {% else %}
                   <p>This product is no longer available.</p>
@@ -90,7 +87,7 @@
       </div>
     {% else %}
       <section class="shop-empty">
-        <p>Your bag is empty.</p>
+        <p>Your cart is empty.</p>
         <a class="shop-button" href="{{ url_for('products.index') }}">Explore products</a>
       </section>
     {% endif %}
