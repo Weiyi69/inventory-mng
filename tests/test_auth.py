@@ -12,6 +12,7 @@ from flask_jwt_extended import decode_token
 
 from app import create_app
 from config import Config
+from extensions import limiter
 from models import AuditLog, Product, RevokedToken, User, db
 
 
@@ -29,6 +30,7 @@ class AuthenticatedTestClient(FlaskClient):
 def auth_app(tmp_path):
     class TestConfig(Config):
         TESTING = True
+        APP_ENV = "test"
         SECRET_KEY = "test-secret-key-for-retailflow-authentication"
         JWT_SECRET_KEY = "test-jwt-secret-key-for-retailflow-authentication"
         SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'auth-test.db'}"
@@ -86,14 +88,37 @@ def client(auth_app):
 def test_login_logout_and_audit_logging(auth_app):
     with auth_app.test_client() as test_client:
         client = test_client
+        login_page = client.get("/login")
+        original_session_csrf = re.search(
+            rb'name="csrf_token" value="([^"]+)"',
+            login_page.data,
+        ).group(1).decode()
+        with client.session_transaction() as state:
+            state["pre_auth_marker"] = "discard-after-login"
         response = login(client)
         assert response.status_code == 302
         assert response.location == "/"
+        assert client.get_cookie("access_token_cookie").http_only
+        with client.session_transaction() as state:
+            assert "login_csrf" not in state
+            assert "pre_auth_marker" not in state
         assert client.get("/profile").status_code == 200
 
         logout = client.post("/auth/logout")
 
         assert logout.status_code == 302
+        assert logout.location == "/products/"
+        assert client.get_cookie("access_token_cookie") is None
+        assert client.get_cookie("refresh_token_cookie", path="/auth") is None
+        with client.session_transaction() as state:
+            assert "login_csrf" not in state
+            assert "cart" not in state
+        new_login_page = client.get("/login")
+        new_session_csrf = re.search(
+            rb'name="csrf_token" value="([^"]+)"',
+            new_login_page.data,
+        ).group(1).decode()
+        assert new_session_csrf != original_session_csrf
         public_catalog = client.get("/products/")
         assert public_catalog.status_code == 200
         assert b"Log out" not in public_catalog.data
@@ -114,7 +139,222 @@ def test_login_rejects_invalid_credentials_and_inactive_accounts(auth_app):
         response = login(test_client, email="staff@example.test")
         assert response.status_code == 401
         assert b"Email or password is incorrect." in response.data
+        assert b'value="staff@example.test"' in response.data
+        assert b'name="password" value=' not in response.data
         assert test_client.get("/products/").status_code == 200
+
+
+def test_login_validates_required_fields_and_email_syntax(auth_app):
+    with auth_app.test_client() as client:
+        page = client.get("/login")
+        csrf = re.search(
+            rb'name="csrf_token" value="([^"]+)"',
+            page.data,
+        ).group(1).decode()
+
+        missing = client.post("/login", data={
+            "csrf_token": csrf,
+            "email": "",
+            "password": "",
+        })
+        assert missing.status_code == 400
+        assert b"Enter your email address." in missing.data
+        assert b"Enter your password." in missing.data
+        assert b'aria-invalid="true"' in missing.data
+        assert b'aria-describedby="email-error"' in missing.data
+        assert b'aria-describedby="password-error"' in missing.data
+        assert b'name="password" value=' not in missing.data
+
+        malformed = client.post("/login", data={
+            "csrf_token": csrf,
+            "email": "not-an-email",
+            "password": "correct-horse-battery",
+        })
+        assert malformed.status_code == 400
+        assert b"Enter a valid email address." in malformed.data
+        assert b'value="not-an-email"' in malformed.data
+
+
+def test_login_rejects_missing_csrf_token(auth_app):
+    with auth_app.test_client() as client:
+        client.get("/login")
+        response = client.post("/login", data={
+            "email": "admin@example.test",
+            "password": "correct-horse-battery",
+        })
+
+    assert response.status_code == 400
+    assert b"Your sign-in form expired." in response.data
+
+
+def test_login_errors_do_not_disclose_account_existence_or_log_email(auth_app):
+    with auth_app.test_client() as client:
+        existing = login(client, email="staff@example.test", password="wrong-password")
+        missing = login(client, email="unknown@example.test", password="wrong-password")
+
+    assert existing.status_code == missing.status_code == 401
+    assert b"Email or password is incorrect." in existing.data
+    assert b"Email or password is incorrect." in missing.data
+    with auth_app.app_context():
+        failure = AuditLog.query.filter_by(event="login_failed").order_by(
+            AuditLog.id.desc()
+        ).first()
+        assert failure.details == {}
+
+
+def test_login_rate_limits_by_ip_and_account_identifier(auth_app):
+    auth_app.config["LOGIN_IP_RATE_LIMIT"] = "2 per hour"
+    auth_app.config["LOGIN_IDENTIFIER_RATE_LIMIT"] = "20 per hour"
+    with auth_app.test_client() as client:
+        first = login(client, email="first-unknown@example.test", password="wrong")
+        second = login(client, email="second-unknown@example.test", password="wrong")
+        limited = login(client, email="third-unknown@example.test", password="wrong")
+
+    assert first.status_code == second.status_code == 401
+    assert limited.status_code == 429
+    assert b"Too many sign-in attempts." in limited.data
+    assert b"per hour" not in limited.data
+
+
+def test_login_rate_limits_account_identifier_across_client_ips(auth_app):
+    auth_app.config["LOGIN_IP_RATE_LIMIT"] = "20 per hour"
+    auth_app.config["LOGIN_IDENTIFIER_RATE_LIMIT"] = "2 per hour"
+    with auth_app.test_client() as client:
+        responses = []
+        for address in ("192.0.2.1", "192.0.2.2", "192.0.2.3"):
+            page = client.get("/login")
+            csrf = re.search(
+                rb'name="csrf_token" value="([^"]+)"',
+                page.data,
+            ).group(1).decode()
+            responses.append(client.post(
+                "/login",
+                data={
+                    "csrf_token": csrf,
+                    "email": "shared-unknown@example.test",
+                    "password": "wrong",
+                },
+                environ_overrides={"REMOTE_ADDR": address},
+            ))
+
+    assert [response.status_code for response in responses] == [401, 401, 429]
+    assert b"Too many sign-in attempts." in responses[-1].data
+
+
+def test_safe_login_redirects_reject_external_destinations(auth_app):
+    with auth_app.test_client() as client:
+        response = client.get("/login?next=https://example.invalid")
+        csrf = re.search(
+            rb'name="csrf_token" value="([^"]+)"',
+            response.data,
+        ).group(1).decode()
+        denied = client.post(
+            "/login?next=https://example.invalid",
+            data={
+                "csrf_token": csrf,
+                "email": "admin@example.test",
+                "password": "correct-horse-battery",
+            },
+        )
+        assert denied.status_code == 302
+        assert denied.location == "/"
+
+    with auth_app.test_client() as client:
+        response = client.get("/login?next=/products/")
+        csrf = re.search(
+            rb'name="csrf_token" value="([^"]+)"',
+            response.data,
+        ).group(1).decode()
+        allowed = client.post(
+            "/login?next=/products/",
+            data={
+                "csrf_token": csrf,
+                "email": "admin@example.test",
+                "password": "correct-horse-battery",
+            },
+        )
+    assert allowed.status_code == 302
+    assert allowed.location == "/products/"
+
+
+def test_login_accessibility_assets_and_responsive_styles(auth_app):
+    with auth_app.test_client() as client:
+        page = client.get("/login")
+        script = client.get("/static/js/login.js")
+        stylesheet = client.get("/static/css/auth.css")
+
+    assert b"/static/js/login.js?v=2" in page.data
+    assert b'aria-label="Show password"' in page.data
+    assert b'aria-pressed="false"' in page.data
+    assert re.search(
+        rb'<button\s+class="auth-password-toggle"\s+type="button"',
+        page.data,
+    )
+    assert b'autocomplete="current-password"' in page.data
+    assert b'lucide-eye-off preview-icon auth-password-icon' in page.data
+    assert b'lucide-eye preview-icon auth-password-icon' in page.data
+    assert b'viewBox="0 0 24 24"' in page.data
+    assert b'stroke-width="2"' in page.data
+    assert b'd="m2 2 20 20"' in page.data
+    assert (
+        b'd="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 '
+        b'19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"'
+    ) in page.data
+    assert b'data-password-icon="visible"' in page.data
+    assert b"hiddenPasswordIcon.hidden = showPassword;" in script.data
+    assert b"visiblePasswordIcon.hidden = !showPassword;" in script.data
+    assert b'aria-live="polite"' in page.data
+    assert b'role="status"' in page.data
+    assert b"data-password-toggle" in script.data
+    assert b"submitButton.disabled = true" in script.data
+    assert b"@media" in stylesheet.data
+    assert b":focus-visible" in stylesheet.data
+    assert b"Forgot password" not in page.data
+
+
+def test_auth_cookies_use_secure_httponly_and_samesite_settings(auth_app):
+    auth_app.config["JWT_COOKIE_SECURE"] = True
+    auth_app.config["SESSION_COOKIE_SECURE"] = True
+    with auth_app.test_client() as client:
+        client.get("/login")
+        session_cookie = client.get_cookie("session")
+        assert session_cookie.secure
+        assert session_cookie.http_only
+        assert session_cookie.same_site == "Lax"
+
+        assert login(client).status_code == 302
+        access_cookie = client.get_cookie("access_token_cookie")
+        refresh_cookie = client.get_cookie("refresh_token_cookie", path="/auth")
+        assert access_cookie.secure and access_cookie.http_only
+        assert refresh_cookie.secure and refresh_cookie.http_only
+        assert access_cookie.same_site == refresh_cookie.same_site == "Lax"
+
+
+def test_rate_limit_storage_errors_fail_closed_with_generic_response(
+    auth_app,
+    monkeypatch,
+):
+    from limits.errors import StorageError
+
+    def fail_storage(*_args, **_kwargs):
+        raise StorageError("private backend details")
+
+    monkeypatch.setattr(limiter._storage, "incr", fail_storage)
+    with auth_app.test_client() as client:
+        page = client.get("/login")
+        csrf = re.search(
+            rb'name="csrf_token" value="([^"]+)"',
+            page.data,
+        ).group(1).decode()
+        response = client.post("/login", data={
+            "csrf_token": csrf,
+            "email": "admin@example.test",
+            "password": "correct-horse-battery",
+        })
+
+    assert response.status_code == 503
+    assert b"Sign-in is temporarily unavailable." in response.data
+    assert b"private backend details" not in response.data
 
 
 def test_cookie_authenticated_logout_requires_csrf(auth_app):
@@ -213,6 +453,8 @@ def test_standard_user_cannot_access_admin_or_product_mutations(auth_app):
         assert products_page.status_code == 200
         assert b"<th>COST</th>" not in products_page.data
         assert test_client.get("/admin/users").status_code == 403
+        assert test_client.get("/admin/orders/").status_code == 403
+        assert test_client.get("/admin/orders/1/").status_code == 403
         assert test_client.post("/products/1/delete").status_code == 403
         assert test_client.post("/products/1/stock", data={"quantity": "5"}).status_code == 403
         assert test_client.post(
@@ -222,7 +464,14 @@ def test_standard_user_cannot_access_admin_or_product_mutations(auth_app):
         assert test_client.post(
             "/products/1/restore",
         ).status_code == 403
-        for path in ("/", "/sales/", "/expenses/", "/reports/"):
+        for path in (
+            "/",
+            "/sales/",
+            "/sales/1/invoice",
+            "/sales/1/invoice.pdf",
+            "/expenses/",
+            "/reports/",
+        ):
             response = test_client.get(path)
             assert response.status_code == 302
             assert response.location == "/products/"
@@ -433,6 +682,8 @@ def test_catalog_styles_provide_responsive_columns_and_contained_images(auth_app
     assert "@media (max-width: 360px)" in stylesheet
     assert "grid-template-columns: 1fr" in stylesheet
     assert "object-fit: contain" in stylesheet
+    assert ".catalog-product-image[hidden]" in stylesheet
+    assert ".catalog-image-placeholder[hidden]" in stylesheet
 
 
 def test_create_admin_command_refuses_a_second_bootstrap(auth_app):
@@ -550,8 +801,38 @@ def test_unprotected_sale_api_rejects_requests_without_login(auth_app):
 def test_app_rejects_missing_or_weak_production_secrets():
     class WeakConfig(Config):
         TESTING = False
+        APP_ENV = "test"
         SECRET_KEY = "not-a-secure-secret"
         JWT_SECRET_KEY = "not-a-secure-jwt-secret"
 
     with pytest.raises(RuntimeError, match="distinct SECRET_KEY and JWT_SECRET_KEY"):
         create_app(WeakConfig)
+
+
+def test_production_requires_secure_cookies_and_shared_redis_limits():
+    class InsecureProductionConfig(Config):
+        TESTING = False
+        APP_ENV = "production"
+        SECRET_KEY = "test-production-secret-key-for-retailflow"
+        JWT_SECRET_KEY = "test-production-jwt-secret-for-retailflow"
+        JWT_COOKIE_SECURE = False
+        SESSION_COOKIE_SECURE = False
+        RATELIMIT_STORAGE_URI = "memory://"
+
+    with pytest.raises(RuntimeError, match="auth and session cookies are Secure"):
+        create_app(InsecureProductionConfig)
+
+    class InsecureSessionCookieConfig(InsecureProductionConfig):
+        JWT_COOKIE_SECURE = True
+        SESSION_COOKIE_SECURE = False
+        RATELIMIT_STORAGE_URI = "redis://localhost:6379/0"
+
+    with pytest.raises(RuntimeError, match="auth and session cookies are Secure"):
+        create_app(InsecureSessionCookieConfig)
+
+    class LocalRateLimitProductionConfig(InsecureProductionConfig):
+        JWT_COOKIE_SECURE = True
+        SESSION_COOKIE_SECURE = True
+
+    with pytest.raises(RuntimeError, match="shared Redis URL"):
+        create_app(LocalRateLimitProductionConfig)

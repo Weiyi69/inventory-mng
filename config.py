@@ -8,6 +8,7 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 
 class Config:
+    APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
     SECRET_KEY = os.environ.get("SECRET_KEY")
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
     JWT_TOKEN_LOCATION = ("cookies",)
@@ -24,8 +25,17 @@ class Config:
     JWT_REFRESH_CSRF_COOKIE_PATH = "/"
     JWT_CSRF_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    RATELIMIT_SWALLOW_ERRORS = False
     RATELIMIT_HEADERS_ENABLED = True
     RATELIMIT_DEFAULT = "300 per hour"
+    LOGIN_IP_RATE_LIMIT = os.environ.get(
+        "LOGIN_IP_RATE_LIMIT",
+        "5 per 15 minutes",
+    )
+    LOGIN_IDENTIFIER_RATE_LIMIT = os.environ.get(
+        "LOGIN_IDENTIFIER_RATE_LIMIT",
+        "10 per hour",
+    )
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SECURE = JWT_COOKIE_SECURE
     SESSION_COOKIE_SAMESITE = "Lax"

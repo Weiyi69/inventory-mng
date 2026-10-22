@@ -1,9 +1,21 @@
 import os
+import secrets
 from datetime import datetime, timezone
 
 import click
-from flask import Flask, abort, g, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Flask,
+    abort,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from flask_jwt_extended import unset_jwt_cookies
+from limits.errors import StorageError
 
 from config import Config
 from extensions import jwt, limiter, migrate
@@ -22,7 +34,25 @@ from security import audit_event
 def create_app(config_object=Config):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
-    if not app.config.get("TESTING"):
+    app_environment = str(app.config.get("APP_ENV", "development")).lower()
+    if app_environment not in {"development", "test", "production"}:
+        raise RuntimeError("APP_ENV must be development, test, or production.")
+    if app_environment == "production":
+        storage_uri = str(app.config.get("RATELIMIT_STORAGE_URI", "")).lower()
+        if (
+            not app.config.get("JWT_COOKIE_SECURE")
+            or not app.config.get("SESSION_COOKIE_SECURE")
+        ):
+            raise RuntimeError(
+                "Set JWT_COOKIE_SECURE=true so auth and session cookies are "
+                "Secure when APP_ENV=production."
+            )
+        if not storage_uri.startswith(("redis://", "rediss://")):
+            raise RuntimeError(
+                "Set RATELIMIT_STORAGE_URI to a shared Redis URL when "
+                "APP_ENV=production."
+            )
+    if app_environment == "production" or not app.config.get("TESTING"):
         secret_key = app.config.get("SECRET_KEY")
         jwt_secret_key = app.config.get("JWT_SECRET_KEY")
         if (
@@ -113,6 +143,29 @@ def create_app(config_object=Config):
     def unauthenticated(error):
         return authentication_error("Please sign in to continue.")
 
+    @app.errorhandler(StorageError)
+    def rate_limit_storage_unavailable(_error):
+        if request.endpoint == "web.login":
+            email = request.form.get("email", "").strip().lower()
+            if len(email) > 254:
+                email = ""
+            return render_template(
+                "login.html",
+                csrf_token=session.setdefault(
+                    "login_csrf",
+                    secrets.token_urlsafe(32),
+                ),
+                email=email,
+                field_errors={},
+                error=(
+                    "Sign-in is temporarily unavailable. "
+                    "Please try again later."
+                ),
+            ), 503
+        return jsonify(
+            error="This request is temporarily unavailable. Please try again later."
+        ), 503
+
     @app.after_request
     def secure_response(response):
         if getattr(g, "current_user", None) is not None:
@@ -181,4 +234,4 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=app.config["APP_ENV"] != "production")

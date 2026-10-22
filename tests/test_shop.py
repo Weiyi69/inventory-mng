@@ -15,6 +15,7 @@ from models import CartItem, Order, Product, Sale, SaleItem, User, db
 
 class ShopTestConfig(Config):
     TESTING = True
+    APP_ENV = "test"
     SECRET_KEY = "test-secret-key-for-retailflow-guest-shop"
     JWT_SECRET_KEY = "test-jwt-secret-key-for-retailflow-guest-shop"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -127,6 +128,7 @@ def test_public_catalog_detail_and_product_images_are_available(shop_app):
         detail = client.get("/products/1/view/")
         cart = client.get("/cart/")
         image = client.get(f"/products/images/{filename}")
+        missing_product = client.get("/products/999/view/")
 
     assert catalog.status_code == detail.status_code == cart.status_code == image.status_code == 200
     assert b"Navy Hoodie" in catalog.data and "₱1,250.00".encode() in catalog.data
@@ -154,7 +156,49 @@ def test_public_catalog_detail_and_product_images_are_available(shop_app):
     assert b'aria-label="Increase quantity"' in detail.data
     assert b"color-swatch" not in detail.data.lower()
     assert image.mimetype == "image/jpeg"
-    assert client.get("/products/999/view/").status_code == 404
+    assert missing_product.status_code == 404
+
+
+def test_product_images_are_not_blocked_by_default_rate_limit(tmp_path):
+    class ImageRateLimitConfig(Config):
+        TESTING = True
+        APP_ENV = "test"
+        SECRET_KEY = "test-secret-key-for-product-image-limit"
+        JWT_SECRET_KEY = "test-jwt-secret-key-for-product-image-limit"
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'image-limit-test.db'}"
+        RATELIMIT_DEFAULT = "1 per hour"
+
+    app = create_app(ImageRateLimitConfig)
+    app.instance_path = str(tmp_path / "instance")
+    filename = "e" * 32 + ".jpg"
+    image_bytes = BytesIO()
+    Image.new("RGB", (8, 8), color="navy").save(image_bytes, format="JPEG")
+    image_dir = Path(app.instance_path) / "uploads" / "products"
+    image_dir.mkdir(parents=True, exist_ok=True)
+    (image_dir / filename).write_bytes(image_bytes.getvalue())
+
+    with app.app_context():
+        db.create_all()
+        db.session.add(Product(
+            name="Rate limited image",
+            sku="RATE-LIMIT-IMAGE",
+            barcode="RATE-LIMIT-IMAGE",
+            category="Clothing",
+            price=10,
+            cost=4,
+            quantity=1,
+            image_filename=filename,
+        ))
+        db.session.commit()
+
+    try:
+        with app.test_client() as client:
+            image_url = f"/products/images/{filename}"
+            responses = [client.get(image_url) for _ in range(2)]
+        assert [response.status_code for response in responses] == [200, 200]
+    finally:
+        with app.app_context():
+            db.drop_all()
 
 
 def test_product_detail_shows_limited_pieces_at_low_stock(shop_app):
@@ -221,7 +265,23 @@ def test_standard_user_cart_persists_and_merges_guest_cart(shop_app):
 
     with shop_app.test_client() as returning_client:
         assert _login(returning_client, "staff@example.test").status_code == 302
+        catalog = returning_client.get("/products/")
         assert "₱3,750.00".encode() in returning_client.get("/cart/").data
+        logout = returning_client.post(
+            "/auth/logout",
+            headers={"X-CSRF-TOKEN": _csrf(catalog)},
+        )
+        assert logout.status_code == 302
+        assert logout.location == "/products/"
+        guest_catalog = returning_client.get(logout.location)
+        assert guest_catalog.status_code == 200
+        assert b'aria-label="Sign in"' in guest_catalog.data
+        assert b"Log out" not in guest_catalog.data
+        assert b'aria-label="Shopping cart, 0 items"' in guest_catalog.data
+        assert b"Your cart is empty" in returning_client.get("/cart/").data
+
+    with shop_app.app_context():
+        assert CartItem.query.one().quantity == 3
 
 
 def test_standard_user_buy_now_isolated_and_orders_are_private(shop_app):

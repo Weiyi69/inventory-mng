@@ -20,8 +20,8 @@ All prices, expenses, reports, and receipts use Philippine pesos (₱).
    python -c "import secrets; print(secrets.token_urlsafe(48))"
    ```
 
-   Keep `.env` private. `JWT_COOKIE_SECURE=false` is for local HTTP development
-   only; set it to `true` when serving the site over HTTPS.
+   Keep `.env` private. `APP_ENV=development`, `JWT_COOKIE_SECURE=false`, and
+   `RATELIMIT_STORAGE_URI=memory://` are for local development only.
 4. Initialize a fresh database and create the first administrator:
 
    ```powershell
@@ -101,11 +101,23 @@ python -m flask --app app db upgrade
   policies that are not stored in the database.
 - Access tokens expire after 15 minutes and refresh tokens rotate for up to
   seven days. Cookies are HttpOnly and same-site; state-changing cookie
-  requests require CSRF tokens.
-- For production, set distinct random `SECRET_KEY` and `JWT_SECRET_KEY`
-  environment values, use HTTPS with `JWT_COOKIE_SECURE=true`, and configure a
-  shared rate-limit storage backend such as Redis via
-  `RATELIMIT_STORAGE_URI`.
+  requests require CSRF tokens. The sign-in form validates required fields and
+  email syntax on both client and server, and credential failures use the same
+  generic message. Password recovery is not currently available because no
+  email delivery service is configured; no recovery link is shown.
+- Sign-in attempts are independently limited by IP and a keyed hash of the
+  normalized account identifier. Configure `LOGIN_IP_RATE_LIMIT` and
+  `LOGIN_IDENTIFIER_RATE_LIMIT` using Flask-Limiter rate-limit syntax.
+- For production, set `APP_ENV=production`, distinct random `SECRET_KEY` and
+  `JWT_SECRET_KEY` values, use HTTPS with `JWT_COOKIE_SECURE=true`, and configure
+  a shared Redis backend via `RATELIMIT_STORAGE_URI` (use `rediss://` when
+  supported by your deployment). Production startup rejects non-Redis or
+  in-memory rate storage and insecure auth cookies. If the rate-limit backend
+  becomes unavailable, requests fail closed with a generic service-unavailable
+  response rather than bypassing the limits.
+- Before enabling password recovery, configure a real email delivery provider
+  and add a complete expiring, single-use token flow; do not send recovery
+  tokens through logs or show them in the UI.
 
 ## Features
 

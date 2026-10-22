@@ -8,6 +8,7 @@ from models import Cart, CartItem, Expense, Order, Product, Sale, SaleItem, db
 def test_auth_migration_preserves_existing_business_records(tmp_path):
     class MigrationTestConfig(Config):
         TESTING = True
+        APP_ENV = "test"
         SECRET_KEY = "migration-test-secret-for-retailflow"
         JWT_SECRET_KEY = "migration-test-jwt-secret-for-retailflow"
         SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'migration-test.db'}"

@@ -29,6 +29,7 @@ class AuthenticatedTestClient(FlaskClient):
 def client(tmp_path):
     class TestConfig(Config):
         TESTING = True
+        APP_ENV = "test"
         SECRET_KEY = "test-secret-key-for-retailflow-authentication"
         JWT_SECRET_KEY = "test-jwt-secret-key-for-retailflow-authentication"
         SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'test.db'}"

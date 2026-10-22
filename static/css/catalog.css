@@ -229,6 +229,10 @@ a {
   transition: transform 220ms ease;
 }
 
+.catalog-product-image[hidden] {
+  display: none;
+}
+
 .catalog-card:hover .catalog-product-image {
   transform: scale(1.025);
 }

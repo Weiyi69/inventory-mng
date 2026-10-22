@@ -1,8 +1,11 @@
 import hmac
+import re
 import secrets
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from flask import (
     Blueprint,
     abort,
@@ -36,14 +39,58 @@ from security import audit_event
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 web_bp = Blueprint("web", __name__)
+_EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+_dummy_password_hasher = PasswordHasher()
+_DUMMY_PASSWORD_HASH = _dummy_password_hasher.hash(secrets.token_urlsafe(32))
 
 
-def _login_error(message):
+def _login_error(message, email="", field_errors=None, status=401):
     return render_template(
         "login.html",
         csrf_token=session.setdefault("login_csrf", secrets.token_urlsafe(32)),
+        email=email,
+        field_errors=field_errors or {},
         error=message,
-    ), 401
+    ), status
+
+
+def _login_identifier_key():
+    identifier = request.form.get("email", "").strip().lower()[:254]
+    if not identifier:
+        identifier = f"<missing>:{request.remote_addr or ''}"
+    digest = hmac.new(
+        current_app.config["SECRET_KEY"].encode("utf-8"),
+        identifier.encode("utf-8"),
+        "sha256",
+    ).hexdigest()
+    return f"login:{digest}"
+
+
+def _login_rate_limit_response(_limit):
+    email = request.form.get("email", "").strip().lower()
+    if len(email) > 254:
+        email = ""
+    return current_app.response_class(
+        render_template(
+            "login.html",
+            csrf_token=session.setdefault(
+                "login_csrf",
+                secrets.token_urlsafe(32),
+            ),
+            email=email,
+            field_errors={},
+            error="Too many sign-in attempts. Please wait before trying again.",
+        ),
+        status=429,
+    )
+
+
+def _verify_dummy_password(password):
+    try:
+        _dummy_password_hasher.verify(_DUMMY_PASSWORD_HASH, password)
+    except (InvalidHashError, VerifyMismatchError):
+        pass
+    return False
 
 
 def _safe_next(value, fallback=None):
@@ -64,28 +111,68 @@ def _safe_next(value, fallback=None):
 
 
 @web_bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("5 per 15 minutes", methods=["POST"])
+@limiter.limit(
+    lambda: current_app.config["LOGIN_IDENTIFIER_RATE_LIMIT"],
+    key_func=_login_identifier_key,
+    methods=["POST"],
+    on_breach=_login_rate_limit_response,
+)
+@limiter.limit(
+    lambda: current_app.config["LOGIN_IP_RATE_LIMIT"],
+    methods=["POST"],
+    on_breach=_login_rate_limit_response,
+)
 def login():
     if request.method == "GET":
         csrf_token = session.setdefault("login_csrf", secrets.token_urlsafe(32))
-        return render_template("login.html", csrf_token=csrf_token, error=None)
+        return render_template(
+            "login.html",
+            csrf_token=csrf_token,
+            email="",
+            field_errors={},
+            error=None,
+        )
 
     expected = session.get("login_csrf", "")
     supplied = request.form.get("csrf_token", "")
     if not expected or not hmac.compare_digest(expected, supplied):
-        abort(400, description="Your sign-in form expired. Please try again.")
+        return _login_error(
+            "Your sign-in form expired. Please try again.",
+            status=400,
+        )
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "")
+    safe_email = email if len(email) <= 254 else ""
+    field_errors = {}
+    if not email:
+        field_errors["email"] = "Enter your email address."
+    elif len(email) > 254 or not _EMAIL_PATTERN.fullmatch(email):
+        field_errors["email"] = "Enter a valid email address."
+    if not password:
+        field_errors["password"] = "Enter your password."
+    if field_errors:
+        return _login_error(
+            "Please correct the highlighted fields.",
+            email=safe_email,
+            field_errors=field_errors,
+            status=400,
+        )
+
     user = User.query.filter_by(email=email).first()
+    password_valid = (
+        user.verify_password(password)
+        if user is not None and user.is_active
+        else _verify_dummy_password(password)
+    )
     if (
         user is None
         or not user.is_active
-        or not user.verify_password(password)
+        or not password_valid
     ):
-        audit_event("login_failed", details={"email": email[:254]})
+        audit_event("login_failed")
         db.session.commit()
         session.pop("login_csrf", None)
-        return _login_error("Email or password is incorrect.")
+        return _login_error("Email or password is incorrect.", email=safe_email)
 
     access_token = create_access_token(
         identity=str(user.id),
@@ -196,10 +283,8 @@ def logout():
             ))
     audit_event("logout", actor=user)
     db.session.commit()
-    session.pop("buy_now", None)
-    session.pop("checkout_key", None)
-    session.pop("checkout_intent", None)
-    response = redirect(url_for("web.login"))
+    session.clear()
+    response = redirect(url_for("products.index"))
     unset_jwt_cookies(response)
     return response
 

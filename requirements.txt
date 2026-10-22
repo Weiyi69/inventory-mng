@@ -1,7 +1,7 @@
 Flask>=3.0,<4.0
 Flask-SQLAlchemy>=3.1,<4.0
 Flask-JWT-Extended>=4.7,<5.0
-Flask-Limiter>=3.8,<5.0
+Flask-Limiter[redis]>=3.8,<5.0
 Flask-Migrate>=4.0,<5.0
 argon2-cffi>=23.1,<26.0
 python-dotenv>=1.0,<2.0

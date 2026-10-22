@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/tab-logo.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+  <script src="{{ url_for('static', filename='js/login.js', v='2') }}" defer></script>
 </head>
 <body class="auth-page">
   <main class="auth-card">
@@ -19,19 +20,108 @@
     <h1>Welcome back</h1>
     <p class="auth-subtitle">Sign in to manage your RetailFlow workspace.</p>
     {% if error %}
-      <div class="auth-error" role="alert">{{ error }}</div>
+      <div class="auth-error" role="alert" id="form-error">{{ error }}</div>
     {% endif %}
-    <form method="post" action="{{ url_for('web.login', next=request.args.get('next', '')) }}">
+    <form
+      id="login-form"
+      method="post"
+      action="{{ url_for('web.login', next=request.args.get('next', '')) }}"
+      novalidate
+    >
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>
-        Email
-        <input name="email" type="email" autocomplete="username" required maxlength="254">
-      </label>
-      <label>
-        Password
-        <input name="password" type="password" autocomplete="current-password" required>
-      </label>
-      <button class="button primary auth-submit" type="submit">Sign in</button>
+      <div class="auth-field">
+        <label for="email">Email</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autocomplete="username"
+          inputmode="email"
+          required
+          maxlength="254"
+          value="{{ email }}"
+          aria-describedby="email-error"
+          {% if field_errors.get("email") %}aria-invalid="true"{% endif %}
+        >
+        <span
+          class="auth-field-error"
+          id="email-error"
+          aria-live="polite"
+          aria-atomic="true"
+        >{{ field_errors.get("email", "") }}</span>
+      </div>
+      <div class="auth-field">
+        <label for="password">Password</label>
+        <span class="auth-password-control">
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+            aria-describedby="password-error"
+            {% if field_errors.get("password") %}aria-invalid="true"{% endif %}
+          >
+          <button
+            class="auth-password-toggle"
+            type="button"
+            aria-label="Show password"
+            aria-pressed="false"
+            data-password-toggle
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-eye-off preview-icon auth-password-icon"
+              aria-hidden="true"
+              focusable="false"
+              data-password-icon="hidden"
+            >
+              <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/>
+              <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/>
+              <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/>
+              <path d="m2 2 20 20"/>
+            </svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-eye preview-icon auth-password-icon"
+              aria-hidden="true"
+              focusable="false"
+              data-password-icon="visible"
+              hidden
+            >
+              <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </span>
+        <span
+          class="auth-field-error"
+          id="password-error"
+          aria-live="polite"
+          aria-atomic="true"
+        >{{ field_errors.get("password", "") }}</span>
+      </div>
+      <button class="button primary auth-submit" type="submit" data-submit-button>
+        <span data-submit-label>Sign in</span>
+        <span class="auth-spinner" aria-hidden="true" hidden></span>
+      </button>
+      <p class="auth-submit-status" role="status" aria-live="polite" hidden data-submit-status></p>
     </form>
   </main>
 </body>

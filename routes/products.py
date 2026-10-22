@@ -24,6 +24,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import RequestEntityTooLarge
 
+from extensions import limiter
 from models import CartItem, OrderItem, Product, SaleItem, db
 from security import access_required, catalog_access
 
@@ -256,6 +257,7 @@ def restore(product_id):
 
 
 @products_bp.get("/images/<string:filename>")
+@limiter.exempt
 @catalog_access
 def product_image(filename):
     if not re.fullmatch(r"[a-f0-9]{32}\.jpg", filename):
