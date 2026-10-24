@@ -132,6 +132,8 @@ def test_public_catalog_detail_and_product_images_are_available(shop_app):
 
     assert catalog.status_code == detail.status_code == cart.status_code == image.status_code == 200
     assert b"Navy Hoodie" in catalog.data and "₱1,250.00".encode() in catalog.data
+    assert b'class="catalog-count"' not in catalog.data
+    assert b'name="q"' in catalog.data and b'name="category"' in catalog.data
     assert b"cost" not in catalog.data.lower()
     for page in (catalog, detail, cart):
         assert b'class="catalog-header-icon"' in page.data
@@ -157,6 +159,44 @@ def test_public_catalog_detail_and_product_images_are_available(shop_app):
     assert b"color-swatch" not in detail.data.lower()
     assert image.mimetype == "image/jpeg"
     assert missing_product.status_code == 404
+
+
+def test_catalog_marks_sold_out_products_over_the_image(shop_app):
+    image_bytes = BytesIO()
+    Image.new("RGB", (30, 40), color="navy").save(image_bytes, format="JPEG")
+    image_dir = Path(shop_app.instance_path) / "uploads" / "products"
+    image_dir.mkdir(parents=True, exist_ok=True)
+    filename = "f" * 32 + ".jpg"
+    (image_dir / filename).write_bytes(image_bytes.getvalue())
+    with shop_app.app_context():
+        with_photo = db.session.get(Product, 1)
+        with_photo.quantity = 0
+        with_photo.image_filename = filename
+        without_photo = db.session.get(Product, 2)
+        without_photo.quantity = 0
+        db.session.add(Product(
+            name="Canvas Tote",
+            sku="TOTE-CANVAS",
+            barcode="100003",
+            category="Accessories",
+            price=Decimal("850.00"),
+            cost=Decimal("300.00"),
+            quantity=4,
+            low_stock_threshold=1,
+        ))
+        db.session.commit()
+
+    with shop_app.test_client() as client:
+        catalog = client.get("/products/")
+
+    assert catalog.status_code == 200
+    assert catalog.data.count(b"class=\"catalog-image-frame sold-out\"") == 2
+    assert catalog.data.count(b"SOLD OUT") == 2
+    assert b"Currently unavailable" not in catalog.data
+    assert b"aria-label=\"View Navy Hoodie details, sold out\"" in catalog.data
+    assert b"aria-label=\"View Cotton Tee details, sold out\"" in catalog.data
+    assert b"Available" in catalog.data
+    assert catalog.data.count(b"New Arrivals") == 1
 
 
 def test_product_images_are_not_blocked_by_default_rate_limit(tmp_path):
@@ -214,6 +254,44 @@ def test_product_detail_shows_limited_pieces_at_low_stock(shop_app):
     assert detail.status_code == 200
     assert b"Limited pieces" in detail.data
     assert b'max="1"' in detail.data
+
+
+def test_product_detail_shows_sold_out_until_restocked(shop_app):
+    with shop_app.app_context():
+        product = db.session.get(Product, 1)
+        product.quantity = 0
+        db.session.commit()
+
+    with shop_app.test_client() as customer:
+        sold_out = customer.get("/products/1/view/")
+        assert sold_out.status_code == 200
+        assert b"Currently unavailable" in sold_out.data
+        assert b'<button class="shop-button sold-out-button" type="button" disabled>' in sold_out.data
+        assert b"Sold out" in sold_out.data
+        assert b"Add to cart" not in sold_out.data
+        assert b"Buy it now" not in sold_out.data
+        assert b'action="/cart/add/1/"' not in sold_out.data
+        assert b'formaction="/buy-now/1/"' not in sold_out.data
+
+    with shop_app.test_client() as admin:
+        assert _login(admin, "admin@example.test").status_code == 302
+        restocked = admin.post(
+            "/products/1/stock",
+            data={
+                "csrf_token": _csrf(admin.get("/products/")),
+                "quantity": "5",
+            },
+        )
+        assert restocked.status_code == 302
+
+    with shop_app.test_client() as customer:
+        available = customer.get("/products/1/view/")
+
+    assert available.status_code == 200
+    assert b"Sold out" not in available.data
+    assert b"Add to cart" in available.data
+    assert b"Buy it now" in available.data
+    assert b'max="5"' in available.data
 
 
 def test_guest_cart_add_update_remove_and_csrf(shop_app):

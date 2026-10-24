@@ -39,9 +39,6 @@
     </section>
 
     <section class="catalog-toolbar" aria-label="Catalog filters">
-      <p class="catalog-count">
-        {{ products|length }} {{ "piece" if products|length == 1 else "pieces" }}
-      </p>
       <form class="catalog-filters" method="get" action="{{ url_for('products.index') }}">
         <label class="catalog-search-label">
           <span class="visually-hidden">Search products</span>
@@ -76,10 +73,12 @@
           <a
             class="catalog-card-link"
             href="{{ url_for('products.view_product', product_id=product.id) }}"
-            aria-label="View {{ product.name }} details"
+            aria-label="View {{ product.name }} details{% if product.quantity <= 0 %}, sold out{% endif %}"
           >
-          <div class="catalog-image-frame">
-            <span class="catalog-new-badge">New Arrivals</span>
+          <div class="catalog-image-frame{% if product.quantity <= 0 %} sold-out{% endif %}">
+            {% if product.quantity > 0 %}
+              <span class="catalog-new-badge">New Arrivals</span>
+            {% endif %}
             {% if product.image_filename %}
               <img
                 class="catalog-product-image"
@@ -105,6 +104,11 @@
                 <span>Photo coming soon</span>
               </div>
             {% endif %}
+            {% if product.quantity <= 0 %}
+              <span class="catalog-sold-out-label" aria-hidden="true">
+                SOLD OUT
+              </span>
+            {% endif %}
           </div>
           <div class="catalog-card-details">
             <h2>{{ product.name }}</h2>
@@ -112,9 +116,9 @@
               <p class="catalog-category">{{ product.category }}</p>
             {% endif %}
             <p class="catalog-price">₱{{ "{:,.2f}".format(product.price) }}</p>
-            {% if not current_user %}
+            {% if not current_user and product.quantity > 0 %}
               <p class="catalog-availability">
-                {{ "Available" if product.quantity > 0 else "Currently unavailable" }}
+                Available
               </p>
             {% endif %}
           </div>

@@ -1,8 +1,9 @@
 import json
 import re
-from uuid import uuid4
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from PIL import Image
@@ -146,6 +147,149 @@ def test_product_barcode_is_generated(client):
     assert b"<svg" in response.data
 
 
+def test_product_can_be_edited_without_changing_stock_and_replace_photo(client):
+    old_filename = "d" * 32 + ".jpg"
+    image_directory = (
+        Path(client.application.instance_path)
+        / "uploads"
+        / "products"
+    )
+    image_directory.mkdir(parents=True, exist_ok=True)
+    old_image_path = image_directory / old_filename
+    old_image_path.write_bytes(b"old image")
+    with client.application.app_context():
+        product = db.session.get(Product, 1)
+        product.image_filename = old_filename
+        db.session.commit()
+
+    original_photo = BytesIO()
+    Image.new("RGB", (20, 20), color="green").save(original_photo, format="JPEG")
+    edit_page = client.get("/products/1/edit")
+    response = client.post(
+        "/products/1/edit",
+        data={
+            "name": "Updated Notebook",
+            "sku": "NOTE-UPDATED",
+            "barcode": "BAR-UPDATED",
+            "category": "Stationery",
+            "size": "A5",
+            "color": "Green",
+            "price": "6.25",
+            "cost": "2.50",
+            "low_stock_threshold": "4",
+            "image": (BytesIO(original_photo.getvalue()), "notebook.jpg"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert edit_page.status_code == 200
+    assert b'value="Notebook"' in edit_page.data
+    assert b'value="10"' not in edit_page.data
+    assert response.status_code == 302
+    with client.application.app_context():
+        product = db.session.get(Product, 1)
+        assert product.name == "Updated Notebook"
+        assert product.sku == "NOTE-UPDATED"
+        assert product.barcode == "BAR-UPDATED"
+        assert product.category == "Stationery"
+        assert product.size == "A5"
+        assert product.color == "Green"
+        assert product.price == Decimal("6.25")
+        assert product.cost == Decimal("2.50")
+        assert product.quantity == 10
+        assert product.low_stock_threshold == 4
+        new_filename = product.image_filename
+        assert new_filename != old_filename
+    assert not old_image_path.exists()
+    uploaded_image = client.get(f"/products/images/{new_filename}")
+    assert uploaded_image.status_code == 200
+    assert uploaded_image.data.startswith(b"\xff\xd8")
+
+
+def test_product_edit_rejects_duplicate_sku_and_preserves_existing_values(client):
+    client.post("/products/", data={
+        "name": "Pen",
+        "sku": "PEN-DUPLICATE",
+        "price": "1.00",
+        "quantity": "3",
+    })
+
+    response = client.post("/products/1/edit", data={
+        "name": "Changed Notebook",
+        "sku": "PEN-DUPLICATE",
+        "barcode": "NOTE-1",
+        "category": "Stationery",
+        "size": "",
+        "color": "",
+        "price": "9.99",
+        "cost": "3.00",
+        "low_stock_threshold": "5",
+    })
+
+    assert response.status_code == 302
+    assert response.location == "/products/1/edit"
+    assert b"SKU and barcode must each be unique" in client.get(response.location).data
+    with client.application.app_context():
+        product = db.session.get(Product, 1)
+        assert product.name == "Notebook"
+        assert product.sku == "NOTE-1"
+        assert product.price == Decimal("4.50")
+        assert product.quantity == 10
+
+
+def test_product_edit_preserves_cost_for_user_without_cost_permission(client):
+    with client.application.app_context():
+        user = db.session.get(User, 1)
+        user.role = "user"
+        user.permissions = {
+            "pages": {"products": True},
+            "actions": {"products.write": True, "products.costs": False},
+        }
+        db.session.commit()
+
+    response = client.post("/products/1/edit", data={
+        "name": "Notebook",
+        "sku": "NOTE-1",
+        "barcode": "NOTE-1",
+        "category": "Stationery",
+        "size": "",
+        "color": "",
+        "price": "5.00",
+        "cost": "0.01",
+        "low_stock_threshold": "5",
+    })
+
+    assert response.status_code == 302
+    with client.application.app_context():
+        product = db.session.get(Product, 1)
+        assert product.price == Decimal("5.00")
+        assert product.cost == Decimal("2.00")
+
+
+def test_archived_product_must_be_restored_before_editing(client):
+    client.post("/sales/", json={"items": [{"product_id": 1, "quantity": 1}]})
+    client.post("/products/1/delete")
+
+    edit_page = client.get("/products/1/edit")
+    update = client.post("/products/1/edit", data={
+        "name": "Changed Notebook",
+        "sku": "NOTE-1",
+        "barcode": "NOTE-1",
+        "category": "Stationery",
+        "price": "5.00",
+        "low_stock_threshold": "5",
+    })
+
+    assert edit_page.status_code == 302
+    assert edit_page.location == "/products/?archived=1"
+    assert update.status_code == 302
+    assert update.location == "/products/?archived=1"
+    with client.application.app_context():
+        product = db.session.get(Product, 1)
+        assert product.name == "Notebook"
+        assert product.is_active is False
+
+
 def test_restock_adds_units_to_existing_inventory(client):
     response = client.post("/products/1/stock", data={"quantity": "6"})
 
@@ -266,6 +410,119 @@ def test_dashboard_and_reports_show_inventory_and_profit_metrics(client):
     assert "₱".encode() in reports.data
 
 
+def test_dashboard_top_sellers_show_photos_and_keep_initial_fallback(client):
+    image_filename = "a" * 32 + ".jpg"
+    with client.application.app_context():
+        notebook = db.session.get(Product, 1)
+        notebook.image_filename = image_filename
+        duplicate_notebook = Product(
+            name="Notebook",
+            sku="NOTE-2",
+            barcode="NOTE-2",
+            category="Stationery",
+            price=Decimal("4.50"),
+            cost=Decimal("2.00"),
+            quantity=10,
+            low_stock_threshold=2,
+        )
+        pen = Product(
+            name="Pen",
+            sku="PEN-1",
+            barcode="PEN-1",
+            category="Stationery",
+            price=Decimal("1.00"),
+            cost=Decimal("0.50"),
+            quantity=10,
+            low_stock_threshold=2,
+        )
+        db.session.add_all([duplicate_notebook, pen])
+        db.session.flush()
+        duplicate_notebook_id = duplicate_notebook.id
+        pen_id = pen.id
+
+        image_path = (
+            Path(client.application.instance_path)
+            / "uploads"
+            / "products"
+            / image_filename
+        )
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"product image")
+        db.session.commit()
+
+    sale = client.post("/sales/", json={
+        "items": [
+            {"product_id": 1, "quantity": 1},
+            {"product_id": duplicate_notebook_id, "quantity": 2},
+            {"product_id": pen_id, "quantity": 1},
+        ],
+    })
+    dashboard = client.get("/")
+    image = client.get(f"/products/images/{image_filename}")
+
+    assert sale.status_code == 201
+    assert dashboard.status_code == 200
+    assert f"/products/images/{image_filename}".encode() in dashboard.data
+    assert b"3 units" in dashboard.data
+    assert b"1 units" in dashboard.data
+    assert b'class="product-mark">P</div>' in dashboard.data
+    assert image.status_code == 200
+    assert image.data == b"product image"
+
+
+def test_recent_sale_rows_show_first_item_photo_or_sale_badge_fallback(client):
+    image_filename = "c" * 32 + ".jpg"
+    with client.application.app_context():
+        notebook = db.session.get(Product, 1)
+        notebook.image_filename = image_filename
+        tee = Product(
+            name="Daily Tee",
+            sku="TEE-RECENT",
+            barcode="TEE-RECENT",
+            category="Clothing",
+            price=Decimal("10.00"),
+            cost=Decimal("5.00"),
+            quantity=10,
+            low_stock_threshold=2,
+        )
+        db.session.add(tee)
+        db.session.flush()
+        tee_id = tee.id
+
+        image_path = (
+            Path(client.application.instance_path)
+            / "uploads"
+            / "products"
+            / image_filename
+        )
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"product image")
+        db.session.commit()
+
+    image_sale = client.post("/sales/", json={
+        "items": [{"product_id": 1, "quantity": 1}],
+    })
+    no_image_sale = client.post("/sales/", json={
+        "items": [{"product_id": tee_id, "quantity": 1}],
+    })
+    sales_page = client.get("/sales/")
+    dashboard = client.get("/")
+
+    assert image_sale.status_code == 201
+    assert no_image_sale.status_code == 201
+    for response in (sales_page, dashboard):
+        assert response.status_code == 200
+        assert f"/products/images/{image_filename}".encode() in response.data
+        assert (
+            f'class="sale-mark">#{no_image_sale.json["id"]}</div>'.encode()
+            in response.data
+        )
+        assert (
+            f'class="sale-mark">#{image_sale.json["id"]}</div>'.encode()
+            not in response.data
+        )
+
+
 def test_currency_is_peso_in_product_pos_and_expense_pages(client):
     client.post("/products/", data={
         "name": "Pen",
@@ -281,6 +538,16 @@ def test_currency_is_peso_in_product_pos_and_expense_pages(client):
     assert "₱12.50".encode() in client.get("/products/").data
     assert "Cash received (₱)".encode() in client.get("/sales/").data
     assert "₱20.00".encode() in client.get("/expenses/").data
+
+
+def test_pos_product_data_is_defined_before_shared_script(client):
+    page = client.get("/sales/")
+
+    assert page.status_code == 200
+    product_data_index = page.data.index(b"window.retailFlowProductData = [")
+    app_script_index = page.data.index(b"/static/js/app.js")
+    assert product_data_index < app_script_index
+    assert b'name: "Notebook"' in page.data
 
 
 @pytest.mark.parametrize(
@@ -307,6 +574,70 @@ def test_all_time_report_groups_activity_by_month(client):
     assert labels
     assert len(labels) >= 1
     assert f'value="all" selected'.encode() in response.data
+
+
+def test_report_product_performance_shows_photos_and_initial_fallback(
+    client,
+    monkeypatch,
+):
+    image_filename = "b" * 32 + ".jpg"
+    with client.application.app_context():
+        notebook = db.session.get(Product, 1)
+        notebook.image_filename = image_filename
+        pen = Product(
+            name="Pen",
+            sku="PEN-REPORT",
+            barcode="PEN-REPORT",
+            category="Stationery",
+            price=Decimal("1.00"),
+            cost=Decimal("0.50"),
+            quantity=10,
+            low_stock_threshold=2,
+        )
+        db.session.add(pen)
+        db.session.flush()
+        pen_id = pen.id
+
+        image_path = (
+            Path(client.application.instance_path)
+            / "uploads"
+            / "products"
+            / image_filename
+        )
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"product image")
+        db.session.commit()
+
+    sale = client.post("/sales/", json={
+        "items": [
+            {"product_id": 1, "quantity": 1},
+            {"product_id": pen_id, "quantity": 2},
+        ],
+    })
+    financial_report = client.get("/reports/")
+
+    assert sale.status_code == 201
+    assert financial_report.status_code == 200
+    assert f"/products/images/{image_filename}".encode() in financial_report.data
+    assert b'class="product-mark">P</span>' in financial_report.data
+    assert "₱4.50".encode() in financial_report.data
+
+    with client.application.app_context():
+        user = db.session.get(User, 1)
+        user.role = "user"
+        db.session.commit()
+
+    monkeypatch.setattr(
+        User,
+        "allows",
+        lambda self, permission: permission in {"reports", "products"},
+    )
+    limited_report = client.get("/reports/")
+
+    assert limited_report.status_code == 200
+    assert f"/products/images/{image_filename}".encode() in limited_report.data
+    assert b'class="product-mark">P</span>' in limited_report.data
+    assert b"TOTAL REVENUE" not in limited_report.data
 
 
 def test_reports_reject_unknown_time_range(client):

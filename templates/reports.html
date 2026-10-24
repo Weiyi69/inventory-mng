@@ -87,11 +87,22 @@
         </thead>
         <tbody>
           {% if show_financials %}
-            {% for name, units, revenue in products %}
+            {% for name, units, revenue, image_filename in products %}
               <tr>
                 <td>
                   <div class="table-product">
-                    <span class="product-mark">{{ name[:1]|upper }}</span>
+                    {% if image_filename %}
+                      <img
+                        class="product-photo"
+                        src="{{ url_for(
+                          'products.product_image',
+                          filename=image_filename
+                        ) }}"
+                        alt=""
+                      >
+                    {% else %}
+                      <span class="product-mark">{{ name[:1]|upper }}</span>
+                    {% endif %}
                     <strong>{{ name }}</strong>
                   </div>
                 </td>
@@ -106,11 +117,22 @@
               </tr>
             {% endfor %}
           {% else %}
-            {% for name, units in products %}
+            {% for name, units, image_filename in products %}
               <tr>
                 <td>
                   <div class="table-product">
-                    <span class="product-mark">{{ name[:1]|upper }}</span>
+                    {% if image_filename %}
+                      <img
+                        class="product-photo"
+                        src="{{ url_for(
+                          'products.product_image',
+                          filename=image_filename
+                        ) }}"
+                        alt=""
+                      >
+                    {% else %}
+                      <span class="product-mark">{{ name[:1]|upper }}</span>
+                    {% endif %}
                     <strong>{{ name }}</strong>
                   </div>
                 </td>

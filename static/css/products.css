@@ -125,6 +125,16 @@
     white-space:nowrap
 }
 
+.product-actions {
+    display:flex;
+    align-items:center;
+    gap:6px
+}
+
+.product-actions form {
+    margin:0
+}
+
 .button.danger-button {
     border:1px solid #f0d9d7;
     background:#fff;

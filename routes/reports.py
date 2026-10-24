@@ -3,7 +3,7 @@ from datetime import datetime, time, timedelta, timezone
 from flask import Blueprint, abort, g, render_template, request
 from sqlalchemy import func
 
-from models import Expense, Sale, SaleItem, db
+from models import Expense, Product, Sale, SaleItem, db
 from security import access_required
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
@@ -116,8 +116,10 @@ def index():
                 SaleItem.product_name,
                 func.sum(SaleItem.quantity).label("units"),
                 func.sum(SaleItem.unit_price * SaleItem.quantity).label("revenue"),
+                func.min(Product.image_filename).label("image_filename"),
             )
             .join(Sale)
+            .outerjoin(Product, SaleItem.product_id == Product.id)
             .filter(Sale.status == "completed")
             .group_by(SaleItem.product_name)
             .order_by(func.sum(SaleItem.unit_price * SaleItem.quantity).desc())
@@ -129,8 +131,10 @@ def index():
             db.session.query(
                 SaleItem.product_name,
                 func.sum(SaleItem.quantity).label("units"),
+                func.min(Product.image_filename).label("image_filename"),
             )
             .join(Sale)
+            .outerjoin(Product, SaleItem.product_id == Product.id)
             .filter(
                 Sale.status == "completed",
                 Sale.created_by_id == g.current_user.id,

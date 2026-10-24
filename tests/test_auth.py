@@ -281,9 +281,32 @@ def test_login_accessibility_assets_and_responsive_styles(auth_app):
     with auth_app.test_client() as client:
         page = client.get("/login")
         script = client.get("/static/js/login.js")
+        password_toggle_script = client.get("/static/js/password-toggle.js")
         stylesheet = client.get("/static/css/auth.css")
 
-    assert b"/static/js/login.js?v=2" in page.data
+    assert b"/static/js/password-toggle.js?v=3" in page.data
+    assert b"/static/js/login.js?v=4" in page.data
+    assert b'class="auth-wordmark">RETAIL FLOW</span>' in page.data
+    assert b'background:#fff' in stylesheet.data
+    assert b"grid-template-rows:110px 1fr" in stylesheet.data
+    assert b".auth-main {" in stylesheet.data
+    assert b"width:min(100%, 372px)" in stylesheet.data
+    assert b"border:0" in stylesheet.data
+    assert b"border-radius:0" in stylesheet.data
+    assert b"background:transparent" in stylesheet.data
+    assert b'border:1px solid #dedede' in stylesheet.data
+    assert b'border-color:#171717' in stylesheet.data
+    assert b".auth-card input:-webkit-autofill" in stylesheet.data
+    assert b"-webkit-box-shadow:0 0 0 1000px #fff inset" in stylesheet.data
+    assert b"background:#e9e5df url" not in stylesheet.data
+    assert b"backdrop-filter" not in stylesheet.data
+    assert b".auth-card input:focus-visible" in stylesheet.data
+    assert b"#438acb" not in stylesheet.data
+    assert b"text-shadow" not in stylesheet.data
+    assert b"border-radius:7px" in stylesheet.data
+    card_styles = stylesheet.data.split(b".auth-card {", 1)[1].split(b"}", 1)[0]
+    assert b"box-shadow" not in card_styles
+    assert b"border-radius" not in card_styles or b"border-radius:0" in card_styles
     assert b'aria-label="Show password"' in page.data
     assert b'aria-pressed="false"' in page.data
     assert re.search(
@@ -291,25 +314,49 @@ def test_login_accessibility_assets_and_responsive_styles(auth_app):
         page.data,
     )
     assert b'autocomplete="current-password"' in page.data
+    assert b'placeholder="Email"' in page.data
+    assert b'placeholder="Your password"' in page.data
     assert b'lucide-eye-off preview-icon auth-password-icon' in page.data
     assert b'lucide-eye preview-icon auth-password-icon' in page.data
     assert b'viewBox="0 0 24 24"' in page.data
     assert b'stroke-width="2"' in page.data
     assert b'd="m2 2 20 20"' in page.data
-    assert (
-        b'd="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 '
-        b'19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"'
-    ) in page.data
+    assert b'd="M10.58 10.58a2 2 0 0 0 2.83 2.83"' in page.data
+    assert b'd="M2.062 12.348' in page.data
     assert b'data-password-icon="visible"' in page.data
-    assert b"hiddenPasswordIcon.hidden = showPassword;" in script.data
-    assert b"visiblePasswordIcon.hidden = !showPassword;" in script.data
+    assert b"const syncVisibility = () =>" in password_toggle_script.data
+    assert b'aria-pressed", String(isVisible)' in password_toggle_script.data
+    assert b"hiddenIcon.hidden" not in password_toggle_script.data
+    assert b"visibleIcon.hidden" not in password_toggle_script.data
+    assert b'.auth-password-toggle[aria-pressed="true"] [data-password-icon="visible"]' in stylesheet.data
     assert b'aria-live="polite"' in page.data
     assert b'role="status"' in page.data
-    assert b"data-password-toggle" in script.data
+    assert b"data-password-toggle" in password_toggle_script.data
+    assert b'document.querySelectorAll("[data-password-toggle]")' in password_toggle_script.data
+    assert b'aria-controls="password"' in page.data
+    assert b"passwordToggle" not in script.data
     assert b"submitButton.disabled = true" in script.data
     assert b"@media" in stylesheet.data
     assert b":focus-visible" in stylesheet.data
     assert b"Forgot password" not in page.data
+
+
+def test_admin_new_password_has_independent_visibility_toggle(auth_app):
+    with auth_app.test_client() as client:
+        assert login(client).status_code == 302
+        page = client.get("/admin/users")
+        password_toggle_script = client.get("/static/js/password-toggle.js")
+
+    assert page.status_code == 200
+    assert b'name="password"' in page.data
+    assert b'autocomplete="new-password"' in page.data
+    assert b'type="button"' in page.data
+    assert b'aria-controls="new-password"' in page.data
+    assert b'data-password-toggle' in page.data
+    assert b'data-password-icon="hidden"' in page.data
+    assert b'data-password-icon="visible"' in page.data
+    assert b"/static/js/password-toggle.js?v=3" in page.data
+    assert password_toggle_script.status_code == 200
 
 
 def test_auth_cookies_use_secure_httponly_and_samesite_settings(auth_app):
@@ -452,6 +499,12 @@ def test_standard_user_cannot_access_admin_or_product_mutations(auth_app):
         products_page = test_client.get("/products/")
         assert products_page.status_code == 200
         assert b"<th>COST</th>" not in products_page.data
+        assert b'href="/products/1/edit"' not in products_page.data
+        assert test_client.get("/products/1/edit").status_code == 403
+        assert test_client.post(
+            "/products/1/edit",
+            data={"name": "Unauthorized", "sku": "UNAUTHORIZED", "price": "1.00"},
+        ).status_code == 403
         assert test_client.get("/admin/users").status_code == 403
         assert test_client.get("/admin/orders/").status_code == 403
         assert test_client.get("/admin/orders/1/").status_code == 403
@@ -684,6 +737,9 @@ def test_catalog_styles_provide_responsive_columns_and_contained_images(auth_app
     assert "object-fit: contain" in stylesheet
     assert ".catalog-product-image[hidden]" in stylesheet
     assert ".catalog-image-placeholder[hidden]" in stylesheet
+    assert ".catalog-toolbar {" in stylesheet
+    assert "justify-content: flex-end;" in stylesheet
+    assert "align-items: flex-end;" in stylesheet
 
 
 def test_create_admin_command_refuses_a_second_bootstrap(auth_app):

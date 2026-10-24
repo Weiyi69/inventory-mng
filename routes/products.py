@@ -153,6 +153,89 @@ def view_product(product_id):
     )
 
 
+@products_bp.get("/<int:product_id>/edit")
+@access_required("products", "products.write")
+def edit(product_id):
+    product = Product.query.get_or_404(product_id)
+    if not product.is_active:
+        flash("Restore this product before editing it.", "error")
+        return redirect(url_for("products.index", archived=1))
+    return render_template(
+        "product_edit.html",
+        product=product,
+        can_view_costs=g.current_user.allows("products.costs"),
+    )
+
+
+@products_bp.post("/<int:product_id>/edit")
+@access_required("products", "products.write")
+def update(product_id):
+    product = Product.query.get_or_404(product_id)
+    if not product.is_active:
+        flash("Restore this product before editing it.", "error")
+        return redirect(url_for("products.index", archived=1))
+
+    new_image_filename = None
+    previous_image_filename = product.image_filename
+    try:
+        name = request.form.get("name", "").strip()
+        sku = request.form.get("sku", "").strip()
+        barcode_value = request.form.get("barcode", "").strip() or sku
+        category = request.form.get("category", "").strip() or "General"
+        size = request.form.get("size", "").strip() or None
+        color = request.form.get("color", "").strip() or None
+        threshold = int(request.form.get("low_stock_threshold", ""))
+        if not name or len(name) > 120:
+            raise ValueError("Product name must contain 1 to 120 characters.")
+        if not sku or len(sku) > 64:
+            raise ValueError("SKU must contain 1 to 64 characters.")
+        if len(barcode_value) > 64:
+            raise ValueError("Barcode must be 64 characters or fewer.")
+        if len(category) > 80:
+            raise ValueError("Category must be 80 characters or fewer.")
+        if size and len(size) > 32:
+            raise ValueError("Size must be 32 characters or fewer.")
+        if color and len(color) > 48:
+            raise ValueError("Color must be 48 characters or fewer.")
+        if threshold < 0:
+            raise ValueError("Low-stock threshold cannot be negative.")
+
+        new_image_filename = _save_product_image(request.files.get("image"))
+        product.name = name
+        product.sku = sku
+        product.barcode = barcode_value
+        product.category = category
+        product.size = size
+        product.color = color
+        product.price = _money(request.form.get("price"), "price")
+        if g.current_user.allows("products.costs"):
+            product.cost = _money(
+                request.form.get("cost", str(product.cost)),
+                "cost",
+            )
+        product.low_stock_threshold = threshold
+        if new_image_filename:
+            product.image_filename = new_image_filename
+        db.session.commit()
+    except (ValueError, TypeError, RequestEntityTooLarge) as error:
+        db.session.rollback()
+        if new_image_filename:
+            _delete_product_image(new_image_filename)
+        flash(str(error), "error")
+        return redirect(url_for("products.edit", product_id=product.id))
+    except IntegrityError:
+        db.session.rollback()
+        if new_image_filename:
+            _delete_product_image(new_image_filename)
+        flash("SKU and barcode must each be unique.", "error")
+        return redirect(url_for("products.edit", product_id=product.id))
+
+    if new_image_filename and previous_image_filename:
+        _delete_product_image(previous_image_filename)
+    flash(f"{product.name} was updated.", "success")
+    return redirect(url_for("products.index"))
+
+
 @products_bp.post("/")
 @access_required("products", "products.write")
 def create():

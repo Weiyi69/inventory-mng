@@ -25,7 +25,66 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>Name<input name="name" maxlength="120" required></label>
       <label>Email<input name="email" type="email" maxlength="254" required></label>
-      <label>Password<input name="password" type="password" minlength="12" required autocomplete="new-password"></label>
+      <label>Password
+        <span class="admin-password-control">
+          <input
+            id="new-password"
+            name="password"
+            type="password"
+            minlength="12"
+            required
+            autocomplete="new-password"
+          >
+          <button
+            id="new-password-toggle"
+            class="admin-password-toggle"
+            type="button"
+            aria-label="Show password"
+            aria-pressed="false"
+            aria-controls="new-password"
+            data-password-toggle
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="admin-password-icon"
+              aria-hidden="true"
+              focusable="false"
+              data-password-icon="hidden"
+            >
+              <path d="M10.58 10.58a2 2 0 0 0 2.83 2.83"/>
+              <path d="M16.68 16.68A10.94 10.94 0 0 1 12 17.5c-5 0-9.27-3.11-11-7.5a11.8 11.8 0 0 1 5.17-6.13"/>
+              <path d="M6.61 6.61A10.94 10.94 0 0 1 12 6.5c5 0 9.27 3.11 11 7.5a11.8 11.8 0 0 1-2.16 3.19"/>
+              <path d="m2 2 20 20"/>
+            </svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="admin-password-icon"
+              aria-hidden="true"
+              focusable="false"
+              data-password-icon="visible"
+            >
+              <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </span>
+      </label>
       <label>Role
         <select name="role">
           <option value="user">User</option>

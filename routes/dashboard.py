@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from flask import Blueprint, g, redirect, render_template, url_for
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload, selectinload
 
 from models import Expense, Product, Sale, SaleItem, db
 from security import (
@@ -97,7 +98,9 @@ def index():
         inventory_value = db.session.query(
             func.coalesce(func.sum(Product.cost * Product.quantity), 0)
         ).scalar()
-    sales_query = Sale.query.filter(Sale.status == "completed")
+    sales_query = Sale.query.options(
+        selectinload(Sale.items).joinedload(SaleItem.product)
+    ).filter(Sale.status == "completed")
     if (
         g.current_user.role != "admin"
         and not g.current_user.allows("sales.view_all")
@@ -116,8 +119,10 @@ def index():
         db.session.query(
             SaleItem.product_name,
             func.sum(SaleItem.quantity).label("units"),
+            func.min(Product.image_filename).label("image_filename"),
         )
         .join(Sale)
+        .outerjoin(Product, SaleItem.product_id == Product.id)
         .filter(Sale.status == "completed")
         .group_by(SaleItem.product_name)
         .order_by(func.sum(SaleItem.quantity).desc())

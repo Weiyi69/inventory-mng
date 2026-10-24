@@ -155,6 +155,7 @@
       {% block content %}{% endblock %}
     </div>
   </main>
+  <script src="{{ url_for('static', filename='js/password-toggle.js', v='3') }}" defer></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
   {% if current_user %}
     <script src="{{ url_for('static', filename='js/auth.js') }}"></script>

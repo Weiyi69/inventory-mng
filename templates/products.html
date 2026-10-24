@@ -70,7 +70,7 @@
               <th>RESTOCK</th>
             {% endif %}
             <th>BARCODE</th>
-            {% if can_delete %}<th>ACTION</th>{% endif %}
+            {% if can_write or can_delete %}<th>ACTION</th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -156,44 +156,61 @@
                   ▥
                 </a>
               </td>
-              {% if can_delete %}
+              {% if can_write or can_delete %}
                 <td>
-                {% if show_archived %}
-                  <form
-                    method="post"
-                    action="{{ url_for(
-                      'products.restore',
-                      product_id=product.id
-                    ) }}"
-                  >
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button
-                      class="button secondary action-button"
-                      type="submit"
-                    >
-                      Restore
-                    </button>
-                  </form>
-                {% else %}
-                  <form
-                    method="post"
-                    action="{{ url_for(
-                      'products.delete',
-                      product_id=product.id
-                    ) }}"
-                    data-confirm="{{ 'Delete ' ~ product.name ~
-                      '? If it has sales history, it will be archived so '
-                      ~ 'old receipts and reports stay intact.' }}"
-                  >
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button
-                      class="button danger-button action-button"
-                      type="submit"
-                    >
-                      Delete
-                    </button>
-                  </form>
-                {% endif %}
+                  <div class="product-actions">
+                    {% if show_archived %}
+                      {% if can_delete %}
+                        <form
+                          method="post"
+                          action="{{ url_for(
+                            'products.restore',
+                            product_id=product.id
+                          ) }}"
+                        >
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                          <button
+                            class="button secondary action-button"
+                            type="submit"
+                          >
+                            Restore
+                          </button>
+                        </form>
+                      {% endif %}
+                    {% else %}
+                      {% if can_write %}
+                        <a
+                          class="button secondary action-button"
+                          href="{{ url_for(
+                            'products.edit',
+                            product_id=product.id
+                          ) }}"
+                        >
+                          Edit
+                        </a>
+                      {% endif %}
+                      {% if can_delete %}
+                        <form
+                          method="post"
+                          action="{{ url_for(
+                            'products.delete',
+                            product_id=product.id
+                          ) }}"
+                          data-confirm="{{ 'Delete ' ~ product.name ~
+                            '? If it has sales history, it will be archived so '
+                            ~ 'old receipts and reports stay intact.' }}"
+                        >
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                          <button
+                            class="button danger-button action-button"
+                            type="submit"
+                          >
+                            Delete
+                          </button>
+                        </form>
+                      {% endif %}
+                    {% endif %}
+                  </div>
                 </td>
               {% endif %}
             </tr>
@@ -202,7 +219,7 @@
               <td
                 colspan="{{ 5 + (1 if can_view_costs else 0) + 3
                   + (1 if not show_archived and can_restock else 0)
-                  + (1 if can_delete else 0) }}"
+                  + (1 if can_write or can_delete else 0) }}"
                 class="table-empty"
               >
                 {% if show_archived %}

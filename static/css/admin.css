@@ -31,6 +31,51 @@
     font:inherit
 }
 
+.admin-password-control {
+    position:relative;
+    display:block
+}
+
+.admin-password-control input {
+    padding-right:42px
+}
+
+.admin-password-toggle {
+    position:absolute;
+    top:50%;
+    right:4px;
+    display:grid;
+    width:32px;
+    height:32px;
+    place-items:center;
+    transform:translateY(-50%);
+    border:0;
+    border-radius:5px;
+    background:transparent;
+    color:#53616b;
+    cursor:pointer
+}
+
+.admin-password-toggle:hover {
+    background:#f2f5f6
+}
+
+.admin-password-toggle:focus-visible {
+    outline:2px solid var(--green);
+    outline-offset:1px
+}
+
+.admin-password-icon {
+    width:18px;
+    height:18px;
+    display:none
+}
+
+.admin-password-toggle[aria-pressed="false"] [data-password-icon="hidden"],
+.admin-password-toggle[aria-pressed="true"] [data-password-icon="visible"] {
+    display:block
+}
+
 .admin-permission-note {
     margin:12px 0 0;
     color:var(--muted);

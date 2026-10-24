@@ -20,6 +20,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from sqlalchemy.orm import joinedload, selectinload
 
 from models import Product, Sale, SaleItem, db
 from security import access_required
@@ -92,7 +93,9 @@ def _parse_items(data):
 @sales_bp.get("/")
 @access_required("sales")
 def index():
-    sales_query = Sale.query.filter(Sale.status == "completed")
+    sales_query = Sale.query.options(
+        selectinload(Sale.items).joinedload(SaleItem.product)
+    ).filter(Sale.status == "completed")
     if (
         g.current_user.role != "admin"
         and not g.current_user.allows("sales.view_all")

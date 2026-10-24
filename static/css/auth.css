@@ -2,57 +2,76 @@
     min-height:100vh;
     min-height:100dvh;
     display:grid;
-    place-items:center;
-    padding:clamp(16px,4vw,24px);
-    background:
-      radial-gradient(circle at 15% 15%, #e5f6ef 0, transparent 28%),
-      var(--canvas)
+    grid-template-rows:110px 1fr;
+    padding:0 clamp(20px,5vw,64px);
+    background:#fff;
+    font-family:"DM Sans","Helvetica Neue",Arial,sans-serif
+}
+
+.auth-brand {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px 0
+}
+
+.auth-wordmark {
+    margin:0;
+    color:#111;
+    font-size:clamp(20px,2.2vw,30px);
+    font-weight:700;
+    letter-spacing:.34em;
+    line-height:1;
+    text-align:center
+}
+
+.auth-main {
+    display:grid;
+    align-content:center;
+    justify-items:center;
+    padding:0 0 10vh
 }
 
 .auth-card {
-    width:min(100%, 420px);
-    padding:clamp(24px,6vw,34px);
-    border:1px solid var(--line);
-    border-radius:14px;
-    background:#fff;
-    box-shadow:0 18px 50px rgba(31,48,64,.09)
-}
-
-.auth-logo {
-    display:block;
-    width:210px;
-    max-width:100%;
-    height:auto;
-    margin:0 auto 24px
+    width:min(100%, 372px);
+    padding:0;
+    border:0;
+    border-radius:0;
+    background:transparent
 }
 
 .auth-card h1 {
-    font:800 27px/1.2 Manrope,sans-serif;
-    margin:0
+    margin:0 0 22px;
+    color:#171717;
+    font:600 24px/1.25 "DM Sans","Helvetica Neue",Arial,sans-serif
 }
 
 .auth-subtitle {
-    margin:8px 0 22px;
-    color:#5c6873;
-    font-size:13px
+    margin:4px 0 18px;
+    color:#777;
+    font-size:12px
 }
 
 .auth-page .eyebrow {
-    color:#5c6873
+    margin:0 0 7px;
+    color:#5c6873;
+    font-size:9px;
+    font-weight:500;
+    letter-spacing:.16em
 }
 
 .auth-card form {
     display:grid;
-    gap:16px
+    gap:14px
 }
 
 .auth-field {
     display:grid;
-    gap:7px;
+    gap:7px
 }
 
 .auth-card label {
-    color:#46515b;
+    color:#333;
     font-size:12px;
     font-weight:600
 }
@@ -60,23 +79,37 @@
 .auth-card input {
     width:100%;
     min-width:0;
-    height:46px;
-    padding:0 12px;
-    border:1px solid #687681;
-    border-radius:7px;
+    height:62px;
+    padding:0 14px;
+    border:1px solid #dedede;
+    border-radius:15px;
     color:var(--ink);
     background:#fff;
-    font-size:16px
+    font-size:15px;
+    transition:border-color 150ms ease, box-shadow 150ms ease
 }
 
 .auth-card input:focus {
-    border-color:var(--green-dark);
-    box-shadow:0 0 0 2px #11856233
+    border-color:#171717;
+    box-shadow:0 0 0 2px rgba(23,23,23,.12);
+    outline:none
+}
+
+.auth-card input:focus-visible {
+    outline:none
+}
+
+.auth-card input:-webkit-autofill,
+.auth-card input:-webkit-autofill:hover,
+.auth-card input:-webkit-autofill:focus {
+    -webkit-text-fill-color:var(--ink);
+    -webkit-box-shadow:0 0 0 1000px #fff inset;
+    caret-color:var(--ink)
 }
 
 .auth-card :focus-visible {
-    outline:3px solid #087b5a;
-    outline-offset:3px
+    outline:2px solid #171717;
+    outline-offset:2px
 }
 
 .auth-password-control {
@@ -85,37 +118,49 @@
 }
 
 .auth-password-control input {
-    padding-right:60px
+    padding-right:56px
 }
 
 .auth-password-toggle {
     position:absolute;
     top:50%;
-    right:8px;
-    min-width:40px;
-    min-height:34px;
-    padding:4px 8px;
+    right:10px;
+    min-width:38px;
+    min-height:38px;
+    padding:6px;
     display:grid;
     place-items:center;
     transform:translateY(-50%);
     border:0;
-    border-radius:5px;
-    color:#075f48;
-    background:#e6f6f0;
+    border-radius:10px;
+    color:#4b5563;
+    background:transparent;
     cursor:pointer
 }
 
 .auth-password-icon {
     width:24px;
-    height:24px
-}
-
-.auth-password-icon[hidden] {
+    height:24px;
     display:none
 }
 
+.auth-password-toggle[aria-pressed="false"] [data-password-icon="hidden"],
+.auth-password-toggle[aria-pressed="true"] [data-password-icon="visible"] {
+    display:block
+}
+
 .auth-password-toggle:hover {
-    background:#d2eee4
+    background:#f3f4f6
+}
+
+.auth-password-toggle:focus-visible {
+    outline:2px solid #171717;
+    outline-offset:1px
+}
+
+.auth-password-control:focus-within input {
+    border-color:#171717;
+    box-shadow:0 0 0 2px rgba(23,23,23,.12)
 }
 
 .auth-field-error {
@@ -139,7 +184,8 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    gap:9px
+    gap:9px;
+    border-radius:7px
 }
 
 .auth-card .auth-submit {
@@ -229,8 +275,22 @@
 }
 
 @media (max-width: 520px) {
-    .auth-card {
-        padding:26px 20px
+    .auth-page {
+        grid-template-rows:88px 1fr;
+        padding:0 22px
+    }
+
+    .auth-main {
+        padding-bottom:8vh
+    }
+
+    .auth-wordmark {
+        letter-spacing:.25em
+    }
+
+    .auth-card input {
+        height:60px;
+        border-radius:14px
     }
 
     .profile-card dl > div {

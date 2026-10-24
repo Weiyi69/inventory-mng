@@ -192,7 +192,19 @@
             {% else %}
               <div class="compact-row sale-row">
             {% endif %}
-              <div class="sale-mark">#{{ sale.id }}</div>
+              {% set first_item_product = sale.items[0].product if sale.items else none %}
+              {% if first_item_product and first_item_product.image_filename and (current_user.role == "admin" or first_item_product.is_active) %}
+                <img
+                  class="product-photo"
+                  src="{{ url_for(
+                    'products.product_image',
+                    filename=first_item_product.image_filename
+                  ) }}"
+                  alt=""
+                >
+              {% else %}
+                <div class="sale-mark">#{{ sale.id }}</div>
+              {% endif %}
               <div class="row-grow">
                 <strong>Sale #{{ sale.id }}</strong>
                 <small>{{ sale.created_at.strftime('%b %d, %H:%M') }}</small>
@@ -225,9 +237,20 @@
       </div>
       {% if top_products %}
         <div class="compact-list">
-          {% for name, units in top_products %}
+          {% for name, units, image_filename in top_products %}
             <div class="compact-row">
-              <div class="product-mark">{{ name[:1]|upper }}</div>
+              {% if image_filename %}
+                <img
+                  class="product-photo"
+                  src="{{ url_for(
+                    'products.product_image',
+                    filename=image_filename
+                  ) }}"
+                  alt=""
+                >
+              {% else %}
+                <div class="product-mark">{{ name[:1]|upper }}</div>
+              {% endif %}
               <div class="row-grow">
                 <strong>{{ name }}</strong>
                 <small>Best seller</small>

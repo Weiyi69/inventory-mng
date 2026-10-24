@@ -19,6 +19,34 @@
     </div>
   </div>
 
+  <script>
+    window.retailFlowProducts = {{ products|map(attribute='id')|list|tojson }};
+    window.retailFlowProductData = [
+      {% for product in products %}
+        {
+          id: {{ product.id }},
+          name: {{ product.name|tojson }},
+          sku: {{ product.sku|tojson }},
+          barcode: {{ product.barcode|tojson }},
+          size: {{ product.size|tojson }},
+          color: {{ product.color|tojson }},
+          image: {{
+            (
+              url_for(
+                'products.product_image',
+                filename=product.image_filename
+              )
+              if product.image_filename
+              else none
+            )|tojson
+          }},
+          price: {{ product.price|float }},
+          stock: {{ product.quantity }}
+        }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+  </script>
+
   <div class="sales-layout">
     {% if can_process %}
     <section class="panel pos-panel">
@@ -90,7 +118,19 @@
               class="compact-row sale-row"
               href="{{ url_for('sales.invoice', sale_id=sale.id) }}"
             >
-              <div class="sale-mark">#{{ sale.id }}</div>
+              {% set first_item_product = sale.items[0].product if sale.items else none %}
+              {% if first_item_product and first_item_product.image_filename and (current_user.role == "admin" or first_item_product.is_active) %}
+                <img
+                  class="product-photo"
+                  src="{{ url_for(
+                    'products.product_image',
+                    filename=first_item_product.image_filename
+                  ) }}"
+                  alt=""
+                >
+              {% else %}
+                <div class="sale-mark">#{{ sale.id }}</div>
+              {% endif %}
               <div class="row-grow">
                 <strong>Sale #{{ sale.id }}</strong>
                 <small>
@@ -107,34 +147,4 @@
       {% endif %}
     </section>
   </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-  window.retailFlowProducts = {{ products|map(attribute='id')|list|tojson }};
-  window.retailFlowProductData = [
-    {% for product in products %}
-      {
-        id: {{ product.id }},
-        name: {{ product.name|tojson }},
-        sku: {{ product.sku|tojson }},
-        barcode: {{ product.barcode|tojson }},
-        size: {{ product.size|tojson }},
-        color: {{ product.color|tojson }},
-        image: {{
-          (
-            url_for(
-              'products.product_image',
-              filename=product.image_filename
-            )
-            if product.image_filename
-            else none
-          )|tojson
-        }},
-        price: {{ product.price|float }},
-        stock: {{ product.quantity }}
-      }{% if not loop.last %},{% endif %}
-    {% endfor %}
-  ];
-</script>
 {% endblock %}

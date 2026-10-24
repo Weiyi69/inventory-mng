@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ product.name }}{% endblock %}
+{% block breadcrumb %}Products / Edit{% endblock %}
+{% block page_styles %}
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/products.css') }}"
+  >
+{% endblock %}
+
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">YOUR CATALOG</p>
+      <h1>Edit product</h1>
+      <p class="subheading">Update product details and pricing.</p>
+    </div>
+    <a class="button secondary" href="{{ url_for('products.index') }}">
+      Back to products
+    </a>
+  </div>
+
+  <section class="panel form-panel">
+    <div class="panel-heading">
+      <div>
+        <h2>{{ product.name }}</h2>
+        <p>Stock quantity: {{ product.quantity }}. Use Restock to change inventory.</p>
+      </div>
+    </div>
+    <form
+      method="post"
+      action="{{ url_for('products.update', product_id=product.id) }}"
+      class="form-grid"
+      enctype="multipart/form-data"
+    >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        Product name
+        <input
+          name="name"
+          required
+          maxlength="120"
+          value="{{ product.name }}"
+        >
+      </label>
+      <label>
+        SKU
+        <input
+          name="sku"
+          required
+          maxlength="64"
+          value="{{ product.sku }}"
+        >
+      </label>
+      <label>
+        Barcode <span class="optional">optional (defaults to SKU)</span>
+        <input
+          name="barcode"
+          maxlength="64"
+          value="{{ product.barcode }}"
+        >
+      </label>
+      <label>
+        Category
+        <input
+          name="category"
+          maxlength="80"
+          value="{{ product.category }}"
+        >
+      </label>
+      <label>
+        Size <span class="optional">optional</span>
+        <input name="size" maxlength="32" value="{{ product.size or '' }}">
+      </label>
+      <label>
+        Color <span class="optional">optional</span>
+        <input name="color" maxlength="48" value="{{ product.color or '' }}">
+      </label>
+      <div class="image-upload-field">
+        <label for="product-image" class="image-upload-label">
+          Product photo
+          <span class="optional">Choose a new JPG, PNG, or WebP photo to replace the current one · max 5 MB</span>
+        </label>
+        <input
+          id="product-image"
+          name="image"
+          type="file"
+          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+          data-image-input
+          hidden
+        >
+        <div class="image-upload-content">
+          <div class="image-preview-wrap">
+            <img
+              data-image-preview
+              alt="Current product photo"
+              class="image-preview{% if not product.image_filename %} hidden{% endif %}"
+              {% if product.image_filename %}
+                src="{{ url_for(
+                  'products.product_image',
+                  filename=product.image_filename
+                ) }}"
+                data-original-src="{{ url_for(
+                  'products.product_image',
+                  filename=product.image_filename
+                ) }}"
+                data-original-name="Current product photo"
+              {% endif %}
+            >
+            <span
+              data-image-placeholder
+              class="image-placeholder{% if product.image_filename %} hidden{% endif %}"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                <path d="M4 5.75A1.75 1.75 0 0 1 5.75 4h12.5A1.75 1.75 0 0 1 20 5.75v12.5A1.75 1.75 0 0 1 18.25 20H5.75A1.75 1.75 0 0 1 4 18.25V5.75Z" />
+                <circle cx="9" cy="9" r="1.5" />
+                <path d="m4.5 16 4.25-4.25a1.77 1.77 0 0 1 2.5 0L13 13.5l1.25-1.25a1.77 1.77 0 0 1 2.5 0L19.5 15" />
+              </svg>
+              <span>Choose a photo to preview</span>
+            </span>
+          </div>
+          <div class="image-upload-actions">
+            <div class="image-upload-controls">
+              <button
+                class="button secondary"
+                type="button"
+                data-choose-image
+              >
+                Choose photo
+              </button>
+              <button
+                class="button secondary image-remove-button hidden"
+                type="button"
+                data-remove-image
+              >
+                Undo photo change
+              </button>
+            </div>
+            <span class="image-file-name" data-image-name>
+              {{ "Current product photo" if product.image_filename else "No photo selected" }}
+            </span>
+            <span class="image-upload-error hidden" data-image-error role="alert"></span>
+          </div>
+        </div>
+      </div>
+      <label>
+        Selling price (₱)
+        <input
+          name="price"
+          type="number"
+          min="0"
+          step="0.01"
+          required
+          value="{{ product.price }}"
+        >
+      </label>
+      {% if can_view_costs %}
+        <label>
+          Unit cost (₱)
+          <input
+            name="cost"
+            type="number"
+            min="0"
+            step="0.01"
+            value="{{ product.cost }}"
+          >
+        </label>
+      {% endif %}
+      <label>
+        Low-stock alert at
+        <input
+          name="low_stock_threshold"
+          type="number"
+          min="0"
+          step="1"
+          required
+          value="{{ product.low_stock_threshold }}"
+        >
+      </label>
+      <div class="form-actions">
+        <a class="button secondary" href="{{ url_for('products.index') }}">Cancel</a>
+        <button class="button primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

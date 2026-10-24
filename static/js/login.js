@@ -2,32 +2,6 @@
   const form = document.getElementById("login-form");
   const email = document.getElementById("email");
   const password = document.getElementById("password");
-  const passwordToggle = document.querySelector("[data-password-toggle]");
-  const hiddenPasswordIcon = passwordToggle?.querySelector(
-    '[data-password-icon="hidden"]',
-  );
-  const visiblePasswordIcon = passwordToggle?.querySelector(
-    '[data-password-icon="visible"]',
-  );
-
-  if (
-    password
-    && passwordToggle
-    && hiddenPasswordIcon
-    && visiblePasswordIcon
-  ) {
-    passwordToggle.addEventListener("click", () => {
-      const showPassword = password.type === "password";
-      password.type = showPassword ? "text" : "password";
-      passwordToggle.setAttribute("aria-pressed", String(showPassword));
-      passwordToggle.setAttribute(
-        "aria-label",
-        showPassword ? "Hide password" : "Show password",
-      );
-      hiddenPasswordIcon.hidden = showPassword;
-      visiblePasswordIcon.hidden = !showPassword;
-    });
-  }
 
   const submitButton = document.querySelector("[data-submit-button]");
   const submitLabel = document.querySelector("[data-submit-label]");

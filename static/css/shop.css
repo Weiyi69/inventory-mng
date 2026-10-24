@@ -198,6 +198,15 @@
   opacity: 0.7;
 }
 
+.shop-button.sold-out-button:disabled,
+.shop-button.sold-out-button:disabled:hover,
+.shop-button.sold-out-button:disabled:focus-visible {
+  border-color: #dededb;
+  background: #f4f4f2;
+  color: #666;
+  cursor: not-allowed;
+}
+
 .shop-button.secondary {
   border-color: #dededb;
   background: #fff;

@@ -65,15 +65,24 @@
     && imageError
   ) {
     let previewUrl;
+    const originalPreviewUrl = imagePreview.dataset.originalSrc || "";
+    const originalImageName = imagePreview.dataset.originalName || "";
     const clearImage = () => {
       imageInput.value = "";
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = undefined;
-      imagePreview.removeAttribute("src");
-      imagePreview.classList.add("hidden");
-      imagePlaceholder.classList.remove("hidden");
+      if (originalPreviewUrl) {
+        imagePreview.src = originalPreviewUrl;
+        imagePreview.classList.remove("hidden");
+        imagePlaceholder.classList.add("hidden");
+        imageName.textContent = originalImageName;
+      } else {
+        imagePreview.removeAttribute("src");
+        imagePreview.classList.add("hidden");
+        imagePlaceholder.classList.remove("hidden");
+        imageName.textContent = "No photo selected";
+      }
       removeImageButton.classList.add("hidden");
-      imageName.textContent = "No photo selected";
     };
 
     chooseImageButton.addEventListener("click", () => imageInput.click());
